@@ -4,6 +4,9 @@
 
 浏览器直接跑，纯前端，无构建步骤，无外部图片/字体/音频资源。
 
+- 在线试玩：https://king952701.github.io/yunshan-voxel/
+- 源码仓库：https://github.com/king952701/yunshan-voxel
+
 ## 运行
 
 ```powershell
