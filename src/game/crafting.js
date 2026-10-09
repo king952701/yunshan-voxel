@@ -4,14 +4,19 @@ import {
   WOOD, BAMBOO, PLANK, STONE, TILE, WALL, LANTERN, TORCH, ORE_IRON, ORE_COAL,
   DIRT, SAND, LEAF_BAMBOO, BRICK, BEAM, WINDOW, MAT, BANNER, STONE_LAMP,
   EAVE, GLAZE_TILE, STELE, ROOF, GATE,
-} from '../world/blocks.js';
+  STICK, IRON, BERRY_FRUIT, MEAT, CHARCOAL, FIBER, COOKED, ROPE, CLOTH, STEW, DRIED,
+  SALVE, TEA, WOOD_SHOVEL, STONE_SHOVEL, IRON_SHOVEL, WOOD_SICKLE, STONE_SICKLE,
+  IRON_SICKLE, IRON_AXE, RATTAN_ARMOR, IRON_ARMOR, GLAZE, MORTAR, PANACEA, RATION,
+  HEAVY_ARMOR,
+} from '../core/items.js';
 
-export const STICK = 100, IRON = 101, BERRY = 103, MEAT = 104, CHARCOAL = 112,
-  FIBER = 113, COOKED = 114, ROPE = 115, CLOTH = 116, STEW = 117, DRIED = 118,
-  SALVE = 119, TEA = 120, WOOD_SHOVEL = 121, STONE_SHOVEL = 122, IRON_SHOVEL = 123,
-  WOOD_SICKLE = 124, STONE_SICKLE = 125, IRON_SICKLE = 126, IRON_AXE = 127,
-  RATTAN_ARMOR = 128, IRON_ARMOR = 129, GLAZE = 130, MORTAR = 131,
-  PANACEA = 132, RATION = 133, HEAVY_ARMOR = 134;
+// 物品 id 常量也搬到了 core/items.js，这里原样转出，老调用方不用改。
+export {
+  STICK, IRON, BERRY_FRUIT as BERRY, MEAT, CHARCOAL, FIBER, COOKED, ROPE, CLOTH, STEW, DRIED,
+  SALVE, TEA, WOOD_SHOVEL, STONE_SHOVEL, IRON_SHOVEL, WOOD_SICKLE, STONE_SICKLE,
+  IRON_SICKLE, IRON_AXE, RATTAN_ARMOR, IRON_ARMOR, GLAZE, MORTAR, PANACEA, RATION,
+  HEAVY_ARMOR,
+};
 
 export const CATEGORIES = [
   { key: 'mat', label: '材料加工' },
@@ -70,10 +75,10 @@ export const RECIPES = [
 
   // ---------- 饮食医药（7） ----------
   { cat: 'food', out: { id: COOKED, count: 1 }, in: { [MEAT]: 1, [CHARCOAL]: 1 }, tip: '篝火炙肉' },
-  { cat: 'food', out: { id: STEW, count: 1 }, in: { [COOKED]: 1, [BERRY]: 2 }, tip: '山珍炖肉·大补' },
-  { cat: 'food', out: { id: DRIED, count: 2 }, in: { [BERRY]: 2, [CHARCOAL]: 1 }, tip: '烘果脯·耐存' },
-  { cat: 'food', out: { id: TEA, count: 1 }, in: { [LEAF_BAMBOO]: 2, [BERRY]: 1 }, tip: '竹叶清茶' },
-  { cat: 'food', out: { id: SALVE, count: 1 }, in: { [BERRY]: 1, [FIBER]: 2 }, tip: '草药膏·止血 35' },
+  { cat: 'food', out: { id: STEW, count: 1 }, in: { [COOKED]: 1, [BERRY_FRUIT]: 2 }, tip: '山珍炖肉·大补' },
+  { cat: 'food', out: { id: DRIED, count: 2 }, in: { [BERRY_FRUIT]: 2, [CHARCOAL]: 1 }, tip: '烘果脯·耐存' },
+  { cat: 'food', out: { id: TEA, count: 1 }, in: { [LEAF_BAMBOO]: 2, [BERRY_FRUIT]: 1 }, tip: '竹叶清茶' },
+  { cat: 'food', out: { id: SALVE, count: 1 }, in: { [BERRY_FRUIT]: 1, [FIBER]: 2 }, tip: '草药膏·止血 35' },
   { cat: 'food', out: { id: PANACEA, count: 1 }, in: { [SALVE]: 2, [TEA]: 1 }, tip: '金疮药·回气 60' },
   { cat: 'food', out: { id: RATION, count: 1 }, in: { [COOKED]: 2, [DRIED]: 1 }, tip: '远行干粮' },
 

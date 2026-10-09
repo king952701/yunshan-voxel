@@ -7,7 +7,7 @@
 <style>
   :root {
     --ink: #12161d; --panel: rgba(16,20,28,.82); --gold: #e8c07a;
-    --jade: #8fc7a8; --paper: #e8e2d2;
+    --jade: #8fc7a8; --paper: #e8e2d2; --line: rgba(232,192,122,.35);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f16; }
@@ -21,43 +21,101 @@
     cursor: grab; display: block;
   }
   #map:active { cursor: grabbing; }
-  #hud {
-    position: absolute; left: 14px; top: 14px; min-width: 210px;
-    background: var(--panel); border: 2px solid rgba(232,192,122,.45);
-    padding: 9px 12px; font-size: 12px; line-height: 1.9;
+  .panel {
+    background: var(--panel); border: 2px solid var(--line);
     box-shadow: 0 0 0 2px rgba(0,0,0,.35);
   }
-  #hud .k { color: var(--gold); }
-  #hud .v { color: #f2e9dc; }
-  #prog {
-    position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
-    background: var(--panel); border: 1px solid var(--gold); padding: 5px 14px;
-    font-size: 12px; display: none;
+  #hud {
+    position: absolute; left: 14px; top: 14px; min-width: 210px;
+    padding: 9px 12px; font-size: 12px; line-height: 1.9;
   }
+  #hud .k { color: var(--gold); }
+  #prog, #toast {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    padding: 5px 14px; font-size: 12px; display: none;
+  }
+  #prog { top: 18px; background: var(--panel); border: 1px solid var(--gold); }
+  #toast { top: 56px; background: rgba(16,20,28,.9); border: 1px solid var(--jade); color: var(--jade); }
   #tip {
     position: absolute; left: 14px; bottom: 14px; font-size: 11px;
-    background: var(--panel); border: 1px solid rgba(232,192,122,.3);
+    background: var(--panel); border: 1px solid var(--line);
     padding: 8px 12px; line-height: 1.9; color: #cfd8e3;
   }
   #tip b { color: var(--gold); font-weight: normal; }
   a.back { color: var(--jade); }
+
+  /* ---- 行囊 ---- */
+  #bagwrap {
+    position: absolute; right: 14px; top: 14px; width: 208px;
+    padding: 8px 10px; font-size: 12px;
+  }
+  #bagwrap h3 { margin: 0 0 6px; font-size: 12px; color: var(--gold); font-weight: normal; }
+  #bag { max-height: 46vh; overflow-y: auto; }
+  .slot {
+    display: flex; align-items: center; gap: 6px; padding: 3px 4px;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .slot:hover { background: rgba(232,192,122,.12); }
+  .slot.on { border-color: var(--gold); background: rgba(232,192,122,.16); }
+  .slot i { width: 10px; height: 10px; flex: 0 0 10px; border: 1px solid rgba(0,0,0,.5); }
+  .slot span { flex: 1; }
+  .slot b { color: var(--gold); font-weight: normal; }
+  .empty { color: #8b8b8b; padding: 4px; }
+
+  /* ---- 合成 ---- */
+  #craft {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    width: min(680px, 92vw); max-height: 76vh; display: none;
+    padding: 12px 14px; font-size: 12px;
+  }
+  #craft h3 { margin: 0 0 8px; font-size: 13px; color: var(--gold); font-weight: normal; }
+  #tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  #tabs button {
+    font: inherit; font-size: 11px; padding: 3px 9px; cursor: pointer;
+    color: #cfd8e3; background: rgba(255,255,255,.06);
+    border: 1px solid var(--line);
+  }
+  #tabs button.on { background: rgba(232,192,122,.22); color: var(--gold); }
+  #craft-body { max-height: 58vh; overflow-y: auto; }
+  .row {
+    display: grid; grid-template-columns: 150px 1fr 108px; gap: 8px;
+    padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,.06); cursor: pointer;
+  }
+  .row:hover { background: rgba(232,192,122,.12); }
+  .row.off { opacity: .45; }
+  .row .out i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border: 1px solid rgba(0,0,0,.5); }
+  .row .in { color: #b9c3cf; }
+  .row .tip { color: var(--jade); font-size: 11px; }
 </style>
 </head>
 <body>
 <canvas id="map"></canvas>
 
-<div id="hud">
-  <div><span class="k">坐标</span> <span class="v" id="coord">0, 0</span></div>
-  <div><span class="k">视野</span> <span class="v" id="zoom">长卷 · 1×</span></div>
-  <div><span class="k">时辰</span> <span class="v" id="clock">--:--</span></div>
-  <div><span class="k">种子</span> <span class="v" id="seed">-</span></div>
-  <div><span class="k">帧率</span> <span class="v" id="perf">-- FPS</span></div>
+<div id="hud" class="panel">
+  <div><span class="k">坐标</span> <span id="coord">0, 0</span></div>
+  <div><span class="k">视野</span> <span id="zoom">长卷 · 1×</span></div>
+  <div><span class="k">时辰</span> <span id="clock">--:--</span></div>
+  <div><span class="k">种子</span> <span id="seed">-</span></div>
+  <div><span class="k">帧率</span> <span id="perf">-- FPS</span></div>
+</div>
+
+<div id="bagwrap" class="panel">
+  <h3>行囊 · 当前建材 <b id="mat" style="color:#e8c07a">青砖</b></h3>
+  <div id="bag"></div>
+</div>
+
+<div id="craft" class="panel">
+  <h3>百工谱 · 五十式（点一条即可合成）</h3>
+  <div id="tabs"></div>
+  <div id="craft-body"></div>
 </div>
 
 <div id="prog">绘制山水长卷 0%</div>
+<div id="toast"></div>
 
 <div id="tip">
-  <b>拖动</b> 漫游 · <b>滚轮</b> 缩放 · <b>WASD</b> 平移 · <b>R</b> 回到中心<br>
+  <b>拖动</b> 漫游 · <b>滚轮</b> 缩放 · <b>WASD</b> 平移 · <b>R</b> 回中心 · <b>C</b> 开合成<br>
+  <b>左键</b> 掘土开采 · <b>右键</b> 垒建材 · <b>1~9</b> 换建材（须先放大到近景）<br>
   整图 8000 × 8000 格，45° 等距投影，最小像素格<br>
   <a class="back" href="./index.html">← 回到 3D 体素版</a>
 </div>

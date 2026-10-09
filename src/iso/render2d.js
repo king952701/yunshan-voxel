@@ -1,6 +1,7 @@
 // 两级渲染：远景走像素长卷（最小像素格），近景逐格画立体块与崖壁
 import { WORLD } from './world2d.js';
 import { surfaceRGB, T } from './palette.js';
+import { blockBaseColor } from '../core/items.js';
 
 const PAPER = [232, 226, 210]; // 未绘制区域的宣纸底色
 
@@ -40,7 +41,7 @@ export function renderFar(img, scroll, view) {
 }
 
 /** 近景：逐格绘制等距块（顶面 + 南侧崖壁），从北往南覆盖 */
-export function renderNear(img, map, view) {
+export function renderNear(img, terra, view) {
   const w = view.w, h = view.h;
   const data = img.data;
   data.fill(0);
@@ -64,22 +65,23 @@ export function renderNear(img, map, view) {
       if (((u + v) & 1) !== 0) continue;
       const wx = (u + v) / 2, wy = (v - u) / 2;
       if (wx < -WORLD / 2 || wx >= WORLD / 2 || wy < -WORLD / 2 || wy >= WORLD / 2) continue;
-      const hgt = map.height(wx, wy);
-      const t = map.type(wx, wy);
+      const hgt = terra.height(wx, wy);
+      const t = terra.type(wx, wy);
+      const m = terra.mat(wx, wy);
       const p = view.projOf(wx, wy, hgt);
       const sx = p[0] - view.camPX + w / 2;
       const sy = p[1] - view.camPY + h / 2;
       if (sx < -tw || sx > w + tw || sy < -th * 4 || sy > h + th * 4) continue;
 
-      // 崖壁：与南侧邻格的落差
-      const hf = map.height(wx + 1, wy + 1);
+      // 崖壁：与南侧邻格的落差（挖出的坑、堆起的台基都会露出来）
+      const hf = terra.height(wx + 1, wy + 1);
       const drop = hgt - hf;
       const jit = ((wx * 31 + wy * 17) % 97) / 48 - 1;
       // 光照：西北来光
-      const hn = map.height(wx - 1, wy - 1);
+      const hn = terra.height(wx - 1, wy - 1);
       let light = 1 + Math.max(-0.34, Math.min(0.34, (hgt - hn) * 0.09));
       if (t === T.DEEP) light = 0.82;
-      const c = surfaceRGB(t, light, jit);
+      const c = m ? matRGB(m, light) : surfaceRGB(t, light, jit);
 
       if (drop > 0) {
         const wallH = drop * th * hz;
@@ -89,6 +91,16 @@ export function renderNear(img, map, view) {
       fillDiamond(data, w, h, sx, sy, tw, th, c);
     }
   }
+}
+
+/** 建材按它自己的代表色上色 */
+function matRGB(id, light) {
+  const b = blockBaseColor(id);
+  return [
+    Math.min(255, ((b >> 16) & 255) * light),
+    Math.min(255, ((b >> 8) & 255) * light),
+    Math.min(255, (b & 255) * light),
+  ];
 }
 
 function fillDiamond(data, w, h, cx, cy, tw, th, c) {

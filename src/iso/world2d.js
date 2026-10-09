@@ -3,6 +3,7 @@
 import { surfaceHeight, riverFactor } from '../core/terrain.js';
 import { fbm2, clamp } from '../core/noise.js';
 import { SEA, SNOW_LINE, T, surfaceRGB } from './palette.js';
+import { blockBaseColor } from '../core/items.js';
 
 export const WORLD = 8000;
 export const HALF = WORLD / 2;
@@ -135,40 +136,79 @@ export class Scroll {
   }
 
   /** 坡度光影：光从西北（屏幕上方）来，山脊受光、背坡压暗 */
-  shade() {
-    const { w, h, hg, tg, rgb } = this;
-    for (let py = 0; py < h; py++) {
-      for (let px = 0; px < w; px++) {
-        const i = py * w + px;
-        let t = tg[i];
-        if (t === OUTSIDE) {
-          rgb[i * 3] = 232; rgb[i * 3 + 1] = 226; rgb[i * 3 + 2] = 210;
-          continue;
-        }
-        const h0 = hg[i];
-        const up = py > 0 ? hg[i - w] : h0;
-        const left = px > 0 ? hg[i - 1] : h0;
-        // 长卷是逐像素直采的，坡度改由相邻像素的高度差补判
-        // 长卷一个像素约跨 10 格，落差超过 3 就当作崖壁
-        if (t !== T.SNOW && Math.abs(h0 - up) + Math.abs(h0 - left) > 3) t = T.ROCK;
-        let light = 1;
-        if (t !== T.DEEP && t !== T.WATER) {
-          const slope = (h0 - up) * 0.035 + (h0 - left) * 0.012;
-          light = 1 + clamp(slope, -0.34, 0.34);
-        } else {
-          // 水面：轻微波纹，越深越暗
-          light = t === T.DEEP ? 0.82 : 0.98;
-          light += ((px * 7 + py * 13) % 5 - 2) * 0.012;
-        }
-        // 高处更亮（空气透视）
-        light += clamp((h0 - SEA) * 0.0022, 0, 0.12);
-        const j = ((px * 31 + py * 17) % 97) / 48 - 1;
-        const c = surfaceRGB(t, light, j);
-        rgb[i * 3] = c[0];
-        rgb[i * 3 + 1] = c[1];
-        rgb[i * 3 + 2] = c[2];
+  shade(terra) {
+    const n = this.w * this.h;
+    for (let i = 0; i < n; i++) this.shadePixel(i, terra);
+  }
+
+  /**
+   * 给单个长卷像素上色。terra 提供改动后的地形，
+   * 玩家垒的建材按建材自己的颜色画，这样动土也能反映到长卷上。
+   */
+  shadePixel(i, terra) {
+    const { w, hg, tg, rgb } = this;
+    const px = i % w, py = (i / w) | 0;
+    let t = tg[i];
+    if (t === OUTSIDE) {
+      rgb[i * 3] = 232; rgb[i * 3 + 1] = 226; rgb[i * 3 + 2] = 210;
+      return;
+    }
+    const h0 = hg[i];
+    const up = py > 0 ? hg[i - w] : h0;
+    const left = px > 0 ? hg[i - 1] : h0;
+    // 长卷是逐像素直采的，坡度改由相邻像素的高度差补判
+    // 长卷一个像素约跨 10 格，落差超过 3 就当作崖壁
+    if (t !== T.SNOW && Math.abs(h0 - up) + Math.abs(h0 - left) > 3) t = T.ROCK;
+    let light = 1;
+    if (t !== T.DEEP && t !== T.WATER) {
+      const slope = (h0 - up) * 0.035 + (h0 - left) * 0.012;
+      light = 1 + clamp(slope, -0.34, 0.34);
+    } else {
+      // 水面：轻微波纹，越深越暗
+      light = t === T.DEEP ? 0.82 : 0.98;
+      light += ((px * 7 + py * 13) % 5 - 2) * 0.012;
+    }
+    // 高处更亮（空气透视）
+    light += clamp((h0 - SEA) * 0.0022, 0, 0.12);
+    const j = ((px * 31 + py * 17) % 97) / 48 - 1;
+    let c = surfaceRGB(t, light, j);
+    if (terra) {
+      const [wx, wy] = this.toWorld(px, py);
+      const m = terra.mat(wx, wy);
+      if (m) {
+        const base = blockBaseColor(m);
+        c = [
+          Math.min(255, ((base >> 16) & 255) * light),
+          Math.min(255, ((base >> 8) & 255) * light),
+          Math.min(255, (base & 255) * light),
+        ];
       }
     }
+    rgb[i * 3] = c[0];
+    rgb[i * 3 + 1] = c[1];
+    rgb[i * 3 + 2] = c[2];
+  }
+
+  /** 玩家动过一格后，把长卷上对应的一小片重画出来 */
+  patch(wx, wy, terra) {
+    if (!this.done) return 0;
+    const [cx, cy] = this.toPixel(wx, wy);
+    const px0 = Math.floor(cx), py0 = Math.floor(cy);
+    let n = 0;
+    for (let y = py0 - 2; y <= py0 + 2; y++) {
+      if (y < 0 || y >= this.h) continue;
+      for (let x = px0 - 2; x <= px0 + 2; x++) {
+        if (x < 0 || x >= this.w) continue;
+        const i = y * this.w + x;
+        if (this.tg[i] === OUTSIDE) continue;
+        const [wx2, wy2] = this.toWorld(x, y);
+        this.hg[i] = terra.height(wx2, wy2);
+        this.tg[i] = terra.type(wx2, wy2);
+        this.shadePixel(i, terra);
+        n++;
+      }
+    }
+    return n;
   }
 
   /** 长卷像素 → 世界格坐标 */
