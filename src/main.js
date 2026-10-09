@@ -30,6 +30,9 @@ sun.position.set(120, 90, 60);
 scene.add(sun);
 const hemi = new THREE.HemisphereLight(0xbcd8ff, 0x4a5a3a, 0.55);
 scene.add(hemi);
+// 随身微光（内息微光）：夜里有月光的底子，脚边不至于伸手不见五指
+const lantern = new THREE.PointLight(0xffcf8a, 0, 11, 1.8);
+scene.add(lantern);
 
 let pixelScale = 2; // 2 = 半分辨率渲染 + 放大，得到像素颗粒感
 function resize() {
@@ -352,18 +355,19 @@ function updateDig(dt) {
 // ------------------------------------------------------------------ 天光
 const SKY_DAY = new THREE.Color(0xbcd9ea);
 const SKY_DAWN = new THREE.Color(0xf0c389);
-const SKY_NIGHT = new THREE.Color(0x121c2e);
+const SKY_NIGHT = new THREE.Color(0x1a2742);
 const tmpColor = new THREE.Color();
 
 function updateSky() {
   const a = (survival.time - 0.25) * Math.PI * 2;
   const dayF = Math.max(0, Math.sin(a));
   sun.position.set(Math.cos(a) * 160, Math.sin(a) * 160, 70);
-  sun.intensity = 0.15 + dayF * 1.25;
+  // 夜里留一层月光底子，否则天色一暗全屏纯黑，路都看不清
+  sun.intensity = 0.24 + dayF * 1.12;
   // 太阳越低越暖（晨昏暖金）
   const warm = 1 - Math.min(1, Math.abs(Math.sin(a)) * 2.0);
   sun.color.setRGB(1, 0.92 - warm * 0.22, 0.78 - warm * 0.42);
-  hemi.intensity = 0.18 + dayF * 0.5;
+  hemi.intensity = 0.38 + dayF * 0.42;
   hemi.color.setRGB(0.55 + dayF * 0.35, 0.65 + dayF * 0.25, 0.85 - warm * 0.15);
 
   if (dayF > 0.02) {
@@ -373,7 +377,11 @@ function updateSky() {
   }
   scene.background.copy(tmpColor);
   scene.fog.color.copy(tmpColor);
-  scene.fog.density = 0.010 + (1 - dayF) * 0.010;
+  scene.fog.density = 0.009 + (1 - dayF) * 0.005;
+
+  // 随身微光跟着视线走，夜里照出脚前几格
+  lantern.position.copy(camera.position);
+  lantern.intensity = (1 - dayF) * 0.9;
 
   // 水下视角
   const headBlock = world.getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 1.2), Math.floor(player.pos.z));
