@@ -117,10 +117,13 @@ export class World {
 
   buildMesh(cx, cz) {
     const c = this.ensureData(cx, cz);
-    this.releaseMesh(c, false);
+    this.releaseMesh(c, true);
     const get = (wx, wy, wz) => this.worldGet(wx, wy, wz);
     const parts = buildChunkGeometry(cx * CHUNK, cz * CHUNK, c.data.blocks, get);
     const group = new THREE.Group();
+    // 几何体顶点是区块内的局部坐标（0..15），靠 group 的位移落到世界坐标上：
+    // 既保证区块各就各位，也让远处顶点的浮点精度更好。
+    group.position.set(cx * CHUNK, 0, cz * CHUNK);
     for (const name of ['opaque', 'water', 'light']) {
       const geo = geometryFrom(parts[name]);
       if (!geo) continue;
