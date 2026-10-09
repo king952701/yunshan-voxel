@@ -1,0 +1,188 @@
+// 8000 x 8000 的中式山水：高度与地表都是 (坐标 + 种子) 的纯函数，
+// 按需分块生成并缓存，绝不预先展开 6400 万格。
+import { surfaceHeight, riverFactor } from '../core/terrain.js';
+import { fbm2, clamp } from '../core/noise.js';
+import { SEA, SNOW_LINE, T, surfaceRGB } from './palette.js';
+
+export const WORLD = 8000;
+export const HALF = WORLD / 2;
+const CH = 64;              // 区块边长（格）
+const MAX_CHUNKS = 1200;    // 缓存上限，超出按生成顺序淘汰
+
+export class Map2D {
+  constructor(seed) {
+    this.seed = seed;
+    this.cache = new Map();
+    this.order = [];
+  }
+
+  inWorld(wx, wy) {
+    return wx >= -HALF && wx < HALF && wy >= -HALF && wy < HALF;
+  }
+
+  chunkOf(cx, cy) {
+    const k = cx + ',' + cy;
+    const hit = this.cache.get(k);
+    if (hit) return hit;
+    const c = this.genChunk(cx, cy);
+    this.cache.set(k, c);
+    this.order.push(k);
+    if (this.order.length > MAX_CHUNKS) this.cache.delete(this.order.shift());
+    return c;
+  }
+
+  genChunk(cx, cy) {
+    const n = CH * CH;
+    const h = new Int16Array(n);
+    const t = new Uint8Array(n);
+    const ox = cx * CH, oy = cy * CH;
+    // 先铺高度：每格只调一次地形函数，坡度留给下一轮用邻格算
+    for (let y = 0; y < CH; y++) {
+      for (let x = 0; x < CH; x++) {
+        h[y * CH + x] = clamp(Math.round(surfaceHeight(ox + x, oy + y, this.seed)), 3, 92);
+      }
+    }
+    for (let y = 0; y < CH; y++) {
+      for (let x = 0; x < CH; x++) {
+        const i = y * CH + x;
+        const h0 = h[i];
+        const hx = x + 1 < CH ? h[i + 1] : h0;
+        const hy = y + 1 < CH ? h[i + CH] : h0;
+        t[i] = classify(ox + x, oy + y, h0, Math.abs(hx - h0) + Math.abs(hy - h0), this.seed);
+      }
+    }
+    return { h, t };
+  }
+
+  height(wx, wy) {
+    if (!this.inWorld(wx, wy)) return SEA - 6;
+    const cx = Math.floor(wx / CH), cy = Math.floor(wy / CH);
+    const c = this.chunkOf(cx, cy);
+    return c.h[(wy - cy * CH) * CH + (wx - cx * CH)];
+  }
+
+  type(wx, wy) {
+    if (!this.inWorld(wx, wy)) return T.DEEP;
+    const cx = Math.floor(wx / CH), cy = Math.floor(wy / CH);
+    const c = this.chunkOf(cx, cy);
+    return c.t[(wy - cy * CH) * CH + (wx - cx * CH)];
+  }
+}
+
+export function classify(wx, wy, h, slope, seed) {
+  if (h <= SEA - 3) return T.DEEP;
+  if (h <= SEA) return T.WATER;
+  if (h <= SEA + 2) return T.SAND;
+  if (h >= SNOW_LINE) return T.SNOW;
+  // 这套地形整体平缓（相邻高差常在 1 格以内），崖壁阈值按实测坡度标定
+  if (slope > 1.8) return T.ROCK;
+  if (riverFactor(wx, wy, seed) > 0.05) return T.BANK;
+  const bamboo = fbm2(wx / 190, wy / 190, seed + 6161, 2);
+  if (bamboo > 0.635) return T.BAMBOO;
+  const m = fbm2(wx / 300, wy / 300, seed + 313, 2);
+  return m > 0.53 ? T.FOREST : T.GRASS;
+}
+
+// ------------------------------------------------------------------ 长卷
+/**
+ * 把 8000x8000 按 45° 等距投影压成一张像素长卷（最小像素格）。
+ * 逐行分帧生成，先出上卷、逐渐向下展开，避免长时间白屏。
+ */
+export const OUTSIDE = 255;   // 图幅之外：留宣纸白边，像画卷的天地头
+
+export class Scroll {
+  constructor(map, w = 1600, h = 800) {
+    this.map = map;
+    this.seed = map.seed;
+    this.w = w;
+    this.h = h;
+    this.hg = new Int16Array(w * h);
+    this.tg = new Uint8Array(w * h);
+    this.rgb = new Uint8Array(w * h * 3);
+    this.row = 0;
+    this.done = false;
+  }
+
+  /** 生成若干行（budget 行），返回是否已完成 */
+  step(budget) {
+    if (this.done) return true;
+    const { w, h } = this;
+    const end = Math.min(h, this.row + budget);
+    for (let py = this.row; py < end; py++) {
+      const v = ((py + 0.5) / h) * 2 * WORLD - WORLD;
+      for (let px = 0; px < w; px++) {
+        const u = ((px + 0.5) / w) * 2 * WORLD - WORLD;
+        const wx = Math.round((u + v) / 2);
+        const wy = Math.round((v - u) / 2);
+        const i = py * w + px;
+        if (!this.map.inWorld(wx, wy)) {
+          this.hg[i] = SEA - 6;
+          this.tg[i] = OUTSIDE;
+          continue;
+        }
+        // 直采单格：长卷要扫过全图，走区块缓存会把 15625 个区块全建出来
+        const hh = clamp(Math.round(surfaceHeight(wx, wy, this.seed)), 3, 92);
+        this.hg[i] = hh;
+        this.tg[i] = classify(wx, wy, hh, 0, this.seed);
+      }
+    }
+    this.row = end;
+    if (this.row >= h) {
+      this.shade();
+      this.done = true;
+    }
+    return this.done;
+  }
+
+  /** 坡度光影：光从西北（屏幕上方）来，山脊受光、背坡压暗 */
+  shade() {
+    const { w, h, hg, tg, rgb } = this;
+    for (let py = 0; py < h; py++) {
+      for (let px = 0; px < w; px++) {
+        const i = py * w + px;
+        let t = tg[i];
+        if (t === OUTSIDE) {
+          rgb[i * 3] = 232; rgb[i * 3 + 1] = 226; rgb[i * 3 + 2] = 210;
+          continue;
+        }
+        const h0 = hg[i];
+        const up = py > 0 ? hg[i - w] : h0;
+        const left = px > 0 ? hg[i - 1] : h0;
+        // 长卷是逐像素直采的，坡度改由相邻像素的高度差补判
+        // 长卷一个像素约跨 10 格，落差超过 3 就当作崖壁
+        if (t !== T.SNOW && Math.abs(h0 - up) + Math.abs(h0 - left) > 3) t = T.ROCK;
+        let light = 1;
+        if (t !== T.DEEP && t !== T.WATER) {
+          const slope = (h0 - up) * 0.035 + (h0 - left) * 0.012;
+          light = 1 + clamp(slope, -0.34, 0.34);
+        } else {
+          // 水面：轻微波纹，越深越暗
+          light = t === T.DEEP ? 0.82 : 0.98;
+          light += ((px * 7 + py * 13) % 5 - 2) * 0.012;
+        }
+        // 高处更亮（空气透视）
+        light += clamp((h0 - SEA) * 0.0022, 0, 0.12);
+        const j = ((px * 31 + py * 17) % 97) / 48 - 1;
+        const c = surfaceRGB(t, light, j);
+        rgb[i * 3] = c[0];
+        rgb[i * 3 + 1] = c[1];
+        rgb[i * 3 + 2] = c[2];
+      }
+    }
+  }
+
+  /** 长卷像素 → 世界格坐标 */
+  toWorld(px, py) {
+    const v = ((py + 0.5) / this.h) * 2 * WORLD - WORLD;
+    const u = ((px + 0.5) / this.w) * 2 * WORLD - WORLD;
+    return [Math.round((u + v) / 2), Math.round((v - u) / 2)];
+  }
+
+  /** 世界格坐标 → 长卷像素 */
+  toPixel(wx, wy) {
+    const u = wx - wy, v = wx + wy;
+    const px = ((u + WORLD) / (2 * WORLD)) * this.w;
+    const py = ((v + WORLD) / (2 * WORLD)) * this.h;
+    return [px, py];
+  }
+}
