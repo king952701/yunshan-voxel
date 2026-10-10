@@ -9,7 +9,10 @@ const DAY_SPEEDS = [
 ];
 
 export function createMenu(opts) {
-  const { skills, settings, onSetting, onResetTerrain } = opts;
+  const {
+    skills, settings, onSetting, onResetTerrain,
+    onSave = () => {}, onLoad = () => {}, onClear = () => {}, saveInfo = () => null,
+  } = opts;
   const codex = buildCodex(skills);
   let open = false, tab = 'help', cat = 'all', query = '', picked = codex[0];
 
@@ -40,6 +43,8 @@ export function createMenu(opts) {
           <div class="row"><span>界面读数</span><span class="btns hud"></span></div>
           <div class="row"><span>复原全部动土</span><span class="btns reset"></span></div>
           <p class="note">复原会把你挖过、垒过的地方全部还原成原始山水，长卷也会重画一遍。</p>
+          <div class="row"><span>存档</span><span class="btns save"></span></div>
+          <p class="note save-note"></p>
         </div>
         <div class="pane" data-pane="about" hidden>
           <p><b>云山录</b>　8000×8000 的中式山水，45° 等距、最小像素格。</p>
@@ -56,6 +61,7 @@ export function createMenu(opts) {
     entries: wrap.querySelector('.entries'),
     detail: wrap.querySelector('.detail'),
     search: wrap.querySelector('.search'),
+    saveNote: wrap.querySelector('.save-note'),
   };
 
   function btn(label, on, fn) {
@@ -120,6 +126,15 @@ export function createMenu(opts) {
   const playerBox = setPane.querySelector('.player');
   const hudBox = setPane.querySelector('.hud');
   const resetBox = setPane.querySelector('.reset');
+  const saveBox = setPane.querySelector('.save');
+
+  function renderSaveNote() {
+    const i = saveInfo();
+    el.saveNote.textContent = i
+      ? `上次存档 ${new Date(i.time).toLocaleString()}　约 ${(i.size / 1024).toFixed(1)} KB`
+        + `　${i.items} 格物品、${i.digs} 处动土。游戏每八秒自动存一次，切后台与关页面时也会存。`
+      : '还没有存档。游戏每八秒自动存一次，切后台与关页面时也会存。';
+  }
 
   function renderSettings() {
     dayBox.innerHTML = '';
@@ -145,6 +160,11 @@ export function createMenu(opts) {
       onResetTerrain();
       api.close();
     }));
+    saveBox.innerHTML = '';
+    saveBox.appendChild(btn('立即存档', false, () => { onSave(); renderSaveNote(); }));
+    saveBox.appendChild(btn('读档', false, () => { onLoad(); renderSaveNote(); }));
+    saveBox.appendChild(btn('清档重开', false, () => { onClear(); renderSaveNote(); }));
+    renderSaveNote();
   }
   renderSettings();
 

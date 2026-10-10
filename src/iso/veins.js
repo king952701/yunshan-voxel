@@ -40,7 +40,7 @@ export function oreInfo(id) { return ORE_BY_ID.get(id) || ORES[0]; }
 export const VEIN_CD = 300;   // 采空后 5 分钟自行复生
 export const BASE_TIME = 5;   // 一次采集 5 秒（技能与镐会缩短）
 export const FX_TIME = 1.2;   // 消失动画时长
-const VB = 32;                // 每 32x32 的片区里长出几处露头矿脉
+export const VB = 32;         // 每 32x32 的片区里长出几处露头矿脉
 
 /**
  * 某格地下埋着什么矿（0 = 无矿）—— 这就是负向 Y 轴的底层。

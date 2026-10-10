@@ -15,6 +15,7 @@ import {
 } from '../game/crafting.js';
 import { itemName, itemColor, qualityOf, ITEMS, BRICK } from '../core/items.js';
 import { createMenu } from './menu.js';
+import { write, read, clearSave, saveInfo } from './save.js';
 
 const params = new URLSearchParams(location.search);
 const SEED = Number(params.get('seed') || 20261010) | 0;
@@ -48,7 +49,21 @@ const nodes = new Nodes(map);
 const skills = new Skills();
 const inv = new Inventory();
 const store = new Inventory(STORE_SIZE);   // 仓库一千格
-startingKit(inv);
+
+// 存档句柄：地形、矿脉、采集点都是按种子确定性生成的，所以只存改动、格子与冷却
+const saveState = {
+  inv, store, skills, terra, veins, nodes, view, settings,
+  get mat() { return selMat; },
+  setMat: (v) => { selMat = v; },
+};
+let saveDirty = false, saveT = 0;
+function markSave() { saveDirty = true; }
+function flushSave(force) {
+  if (!force && !saveDirty) return false;
+  saveT = 0;
+  saveDirty = false;
+  return write(saveState);
+}
 let selMat = BRICK;
 let img = null;
 let hover = null;
@@ -200,6 +215,7 @@ function act(kind) {
 function say(msg) {
   toastText = msg;
   toastLeft = 2.2;
+  markSave();   // 有过动作就记一笔，八秒后落盘
 }
 
 // ------------------------------------------------------------------ 采集
@@ -662,6 +678,9 @@ function frame(now) {
   nodes.tick(dt);
   if (toastLeft > 0) toastLeft -= dt;
 
+  saveT += dt;
+  if (saveDirty && saveT > 8) flushSave();
+
   if (!scroll.done) scroll.step(12);
 
   if (view.near) renderNear(img, terra, view);
@@ -732,20 +751,53 @@ function frame(now) {
 }
 
 resize();
-view.lookAt(0, 0);
+
+// 有档接着玩，没档才发开局行囊
+if (read(saveState)) {
+  const info = saveInfo();
+  say(info
+    ? `读档：接着上次的山水（${info.items} 格物品、${info.digs} 处动土）`
+    : '读档：接着上次的山水');
+} else {
+  view.lookAt(0, 0);
+  startingKit(inv);
+  say('新开一卷山水：拖动漫游，滚轮放大到近景才好动土');
+}
 renderBag();
 requestAnimationFrame(frame);
+
+// 切后台与关页面时务必落盘：手机上随时会被系统收走
+window.addEventListener('beforeunload', () => flushSave(true));
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(true); });
 
 // 设置菜单：设置 / 帮助（内置数据库）/ 关于
 menuApi = createMenu({
   skills,
   settings,
-  onSetting: () => {},
+  onSetting: () => { markSave(); },
   onResetTerrain: () => {
     const n = terra.reset();
     if (n) { scroll.repaint(); say(`复原 ${n} 处动土，山水回到最初`); }
     else say('还没有动过土');
   },
+  onSave: () => { say(flushSave(true) ? '已存档' : '这台设备不让存档'); },
+  onLoad: () => {
+    if (read(saveState)) { renderBag(); say('读档：回到上次存档的地方'); }
+    else say('还没有存档');
+  },
+  onClear: () => {
+    clearSave();
+    terra.reset();
+    scroll.repaint();
+    inv.slots.fill(null);
+    store.slots.fill(null);
+    for (const k of Object.keys(skills.lv)) { skills.lv[k] = 1; skills.xp[k] = 0; }
+    startingKit(inv);
+    view.lookAt(0, 0);
+    renderBag();
+    say('清档重开：一切回到最初');
+  },
+  saveInfo,
 });
 document.getElementById('gear').onclick = () => menuApi.toggle();
 
