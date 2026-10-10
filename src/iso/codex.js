@@ -4,7 +4,8 @@ import {
   ITEMS, BLOCKS, QUALITY, qualityOf, itemName, itemColor, itemIcon,
 } from '../core/items.js';
 import { ORES, VEIN_CD, BASE_TIME } from './veins.js';
-import { SKILLS } from './skill.js';
+import { KINDS, NODE_CD, NB } from './nodes.js';
+import { SKILLS, SKILL_BY_KEY } from './skill.js';
 import { RECIPES, CATEGORIES } from '../game/crafting.js';
 import { BUILD_MATS } from './edit2d.js';
 import { WORLD } from './world2d.js';
@@ -15,6 +16,7 @@ export const CATS = [
   { key: 'all', label: '全部' },
   { key: 'item', label: '物品道具' },
   { key: 'ore', label: '矿脉' },
+  { key: 'node', label: '采集点' },
   { key: 'block', label: '方块' },
   { key: 'recipe', label: '配方' },
   { key: 'skill', label: '技能' },
@@ -48,6 +50,18 @@ export function buildCodex(skills) {
       body: `埋在地表之下，露头处按 E 开采。每次得 ${o.count} 个，采矿经验 ${o.exp}。`
         + `基础耗时 ${BASE_TIME} 秒，采矿等级与镐都会缩短；采空后 ${VEIN_CD} 秒（5 分钟）自行复生。`,
       tags: `矿 矿脉 采矿 ${o.name} ${qualityOf(o.id).name}`,
+    });
+  }
+
+  for (const [key, k] of Object.entries(KINDS)) {
+    const sk = SKILL_BY_KEY.get(k.skill);
+    out.push({
+      cat: 'node', title: k.name, color: k.color, icon: k.icon,
+      sub: `${sk ? sk.name : k.skill} · ${k.tool ? `须持${TOOL_CN[k.tool]}` : '徒手即可'}`,
+      body: `地表采集点，走近按 E 采集，耗时随${sk ? sk.name : k.skill}等级与家伙好坏缩短。`
+        + `采空后 ${NODE_CD} 秒（5 分钟）自行复生。每 ${NB}×${NB} 的片区按地形长出几处：`
+        + `${sk ? sk.desc : ''}`,
+      tags: `${k.name} 采集点 ${sk ? sk.name : ''} ${k.tool || '徒手'}`,
     });
   }
 

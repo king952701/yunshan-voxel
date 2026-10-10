@@ -64,17 +64,23 @@ export function startingKit(inv) {
   inv.add(BRICK, 20);
   inv.add(MAT, 12);
   inv.add(102, 1);   // 木镐：开局就能采矿
+  inv.add(360, 1);   // 竹钓竿：开局就能垂钓
+}
+
+/** 包里最趁手的某类家伙（pickaxe / axe / shovel / sickle / sword / rod） */
+export function bestTool(inv, kind) {
+  let best = null;
+  for (const id of inv.slots.keys()) {
+    const it = ITEMS[id];
+    if (!it || !it.tool || it.tool.kind !== kind) continue;
+    if (!best || it.tool.tier > best.tier) best = { id, ...it.tool };
+  }
+  return best;
 }
 
 /** 包里最好的那把镐（没有镐就采不了矿） */
 export function bestPick(inv) {
-  let best = null;
-  for (const id of inv.slots.keys()) {
-    const it = ITEMS[id];
-    if (!it || !it.tool || it.tool.kind !== 'pickaxe') continue;
-    if (!best || it.tool.tier > best.tier) best = { id, ...it.tool };
-  }
-  return best;
+  return bestTool(inv, 'pickaxe');
 }
 
 /**

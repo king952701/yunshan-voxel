@@ -5,10 +5,11 @@ import { View2D, ZOOM_MULTS } from './view2d.js';
 import { renderFar, renderNear } from './render2d.js';
 import { skyFilter } from './palette.js';
 import {
-  Terra, Inventory, startingKit, BUILD_MATS, bestPick,
+  Terra, Inventory, startingKit, BUILD_MATS, bestPick, bestTool,
 } from './edit2d.js';
 import { Veins, oreInfo, FX_TIME, BASE_TIME } from './veins.js';
-import { Skills, gatherTime } from './skill.js';
+import { Nodes, KINDS, kindInfo, NODE_CD } from './nodes.js';
+import { Skills, SKILLS, gatherTime } from './skill.js';
 import { RECIPES, CATEGORIES, canCraft, craft } from '../game/crafting.js';
 import { itemName, itemColor, qualityOf, BRICK } from '../core/items.js';
 import { createMenu } from './menu.js';
@@ -39,6 +40,7 @@ const scroll = new Scroll(map);
 const view = new View2D();
 const terra = new Terra(map);
 const veins = new Veins(map);
+const nodes = new Nodes(map);
 const skills = new Skills();
 const inv = new Inventory();
 startingKit(inv);
@@ -136,38 +138,86 @@ function say(msg) {
   toastLeft = 2.2;
 }
 
-// ------------------------------------------------------------------ 采矿
+// ------------------------------------------------------------------ 采集
+const ACT = {
+  mining: '开采', logging: '伐木', herbal: '采药',
+  fishing: '垂钓', hunting: '狩猎', digging: '掘土', foraging: '拾取',
+};
+const TOOL_CN = {
+  pickaxe: '矿镐', axe: '斧', shovel: '铲', sickle: '镰', sword: '兵器', rod: '钓竿',
+};
+const SKILL_CN = Object.fromEntries(SKILLS.map((s) => [s.key, s.name]));
+
+/** 脚边有什么可采：矿脉与地表采集点取更近的那个 */
+function targetAt(wx, wy, r = 2) {
+  const p = veins.nearest(wx, wy, r);
+  const n = nodes.nearest(wx, wy, r);
+  if (!p) return n ? { kind: 'node', p: n } : null;
+  if (!n) return { kind: 'vein', p };
+  const dp = Math.abs(p.wx - wx) + Math.abs(p.wy - wy);
+  const dn = Math.abs(n.wx - wx) + Math.abs(n.wy - wy);
+  return dn < dp ? { kind: 'node', p: n } : { kind: 'vein', p };
+}
+
+/** 用哪门技能、哪件家伙、采得什么 */
+function targetMeta(t) {
+  if (t.kind === 'vein') {
+    const info = oreInfo(t.p.ore);
+    return {
+      skill: 'mining', tool: 'pickaxe', tier: info.tier, exp: info.exp,
+      name: info.name, out: { id: t.p.ore, count: info.count },
+    };
+  }
+  const k = kindInfo(t.p.kind);
+  const loot = t.p.loot;
+  const q = qualityOf(loot.id).tier;
+  return {
+    skill: k.skill, tool: k.tool, tier: 0, exp: 8 + q * 4,
+    name: itemName(loot.id), out: loot,
+  };
+}
+
 function startGather() {
   if (gather) return;
-  if (!view.near) { say('放大到近景才看得见矿脉'); return; }
+  if (!view.near) { say('放大到近景才看得见采集点'); return; }
   const c = view.center();
-  const p = veins.nearest(c[0], c[1], 2);
-  if (!p) { say('脚边没有可采的矿脉'); return; }
-  const pick = bestPick(inv);
-  if (!pick) { say('须持矿镐（百工谱里可合成）'); return; }
-  const info = oreInfo(p.ore);
-  if (pick.tier < info.tier) { say(`${info.name}太硬，${itemName(pick.id)}啃不动`); return; }
-  gather = { node: p, t: 0, dur: gatherTime(skills, 'mining', pick.speed) };
-  say(`开采${info.name}…`);
+  const t = targetAt(c[0], c[1], 2);
+  if (!t) { say('脚边没有可采的东西'); return; }
+  const m = targetMeta(t);
+  let speed = 0;
+  if (m.tool) {
+    const tool = bestTool(inv, m.tool);
+    if (!tool) { say(`须持${TOOL_CN[m.tool]}（百工谱里可合成）`); return; }
+    if (tool.tier < m.tier) { say(`${m.name}太硬，${itemName(tool.id)}啃不动`); return; }
+    speed = tool.speed;
+  }
+  gather = { kind: t.kind, node: t.p, t: 0, dur: gatherTime(skills, m.skill, speed) };
+  say(`${ACT[m.skill]}${m.name}…`);
 }
 
 function tickGather(dt) {
   if (!gather) return;
   const c = view.center();
-  if (Math.abs(c[0] - gather.node.wx) + Math.abs(c[1] - gather.node.wy) > 2) {
+  const p = gather.node;
+  if (Math.abs(c[0] - p.wx) + Math.abs(c[1] - p.wy) > 2) {
     gather = null;
     say('走开了，采集中断');
     return;
   }
   gather.t += dt;
   if (gather.t < gather.dur) return;
-  const info = oreInfo(gather.node.ore);
-  veins.mine(gather.node);
-  const got = inv.add(gather.node.ore, info.count);
-  const up = skills.gain('mining', info.exp);
-  say(got
-    ? `${info.name}×${got}` + (up ? `　采矿升至 ${skills.level('mining')} 级` : '')
-    : `${itemName(gather.node.ore)}带不下了`);
+  const m = targetMeta({ kind: gather.kind, p });
+  if (gather.kind === 'vein') veins.mine(p);
+  else nodes.take(p);
+  const got = inv.add(m.out.id, m.out.count);
+  let msg = got ? `${m.name}×${got}` : `${m.name}带不下了`;
+  const up = skills.gain(m.skill, m.exp);
+  if (up) msg += `　${SKILL_CN[m.skill]}升至 ${skills.level(m.skill)} 级`;
+  if (m.out.extra) {
+    const g2 = inv.add(m.out.extra.id, m.out.extra.count);
+    if (g2) msg += `　另得${itemName(m.out.extra.id)}×${g2}`;
+  }
+  say(msg);
   gather = null;
   renderBag();
 }
@@ -317,6 +367,44 @@ function drawPlayer(c) {
   ctx.fillRect(s[0] - 3, s[1] - 8, 7, 1);
 }
 
+/** 地表采集点：树画树冠、钓点画涟漪、兽画身形，一眼能分 */
+function drawNodes(c) {
+  const R = 40;
+  const list = nodes.inRect(c[0] - R, c[1] - R, c[0] + R, c[1] + R);
+  for (const p of list) {
+    const k = kindInfo(p.kind);
+    const s = screenOf(p.wx, p.wy, 1);
+    ctx.fillStyle = k.color;
+    if (p.kind === 'tree') {
+      ctx.beginPath();
+      ctx.moveTo(s[0], s[1] - 10);
+      ctx.lineTo(s[0] - 5, s[1] - 1);
+      ctx.lineTo(s[0] + 5, s[1] - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(s[0] - 1, s[1] - 2, 2, 3);
+    } else if (p.kind === 'fish') {
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.ellipse(s[0], s[1], 6, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.kind === 'beast') {
+      ctx.fillRect(s[0] - 4, s[1] - 6, 8, 4);
+      ctx.fillRect(s[0] - 4, s[1] - 2, 2, 3);
+      ctx.fillRect(s[0] + 2, s[1] - 2, 2, 3);
+    } else if (p.kind === 'soil') {
+      ctx.beginPath();
+      ctx.ellipse(s[0], s[1], 5, 2.5, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(s[0], s[1] - 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
 function drawGather(c) {
   ctx.font = '11px monospace';
   ctx.textAlign = 'center';
@@ -331,13 +419,15 @@ function drawGather(c) {
     ctx.fillStyle = '#f2c14e';
     ctx.fillRect(x, y, w * Math.min(1, gather.t / gather.dur), hh);
     ctx.fillStyle = '#f2e9dc';
-    ctx.fillText(`采 ${oreInfo(p.ore).name} ${Math.max(0, gather.dur - gather.t).toFixed(1)}s`, s[0], y - 4);
+    const m = targetMeta({ kind: gather.kind, p });
+    ctx.fillText(`${ACT[m.skill]} ${m.name} ${Math.max(0, gather.dur - gather.t).toFixed(1)}s`, s[0], y - 4);
   } else if (settings.showHint) {
-    const p = veins.nearest(c[0], c[1], 2);
-    if (p) {
+    const t = targetAt(c[0], c[1], 2);
+    if (t) {
+      const m = targetMeta(t);
       const s = screenOf(c[0], c[1], 2);
       ctx.fillStyle = 'rgba(12,16,22,.8)';
-      const label = `[E] 采 ${oreInfo(p.ore).name}`;
+      const label = `[E] ${ACT[m.skill]} ${m.name}`;
       const w = ctx.measureText(label).width + 10;
       ctx.fillRect(s[0] - w / 2, s[1] - 26, w, 14);
       ctx.fillStyle = '#f2c14e';
@@ -375,6 +465,7 @@ function frame(now) {
   handleKeys(dt);
   tickGather(dt);
   if (veins.tick(dt) > 0) say('矿脉复生');
+  nodes.tick(dt);
   if (toastLeft > 0) toastLeft -= dt;
 
   if (!scroll.done) scroll.step(12);
@@ -401,6 +492,7 @@ function frame(now) {
       ctx.stroke();
     }
     drawVeins(c);
+    drawNodes(c);
     if (settings.showPlayer) drawPlayer(c);
     drawGather(c);
   }
@@ -422,11 +514,19 @@ function frame(now) {
     el.prog.style.display = 'none';
   }
   el.seed.textContent = String(SEED);
-  const pick = bestPick(inv);
-  el.pick.textContent = pick ? itemName(pick.id) : '空手';
-  el.skill.textContent = `采矿 ${skills.level('mining')} 级 ${skills.exp('mining')}/${skills.needNext('mining')}`;
-  const near = view.near ? veins.nearest(c[0], c[1], 2) : null;
-  el.vein.textContent = near ? `脚边有${oreInfo(near.ore).name}` : (view.near ? '近处无矿' : '—');
+  const near = view.near ? targetAt(c[0], c[1], 2) : null;
+  if (near) {
+    const m = targetMeta(near);
+    const tool = m.tool ? bestTool(inv, m.tool) : null;
+    el.pick.textContent = m.tool ? (tool ? itemName(tool.id) : `缺${TOOL_CN[m.tool]}`) : '徒手即可';
+    el.skill.textContent = `${SKILL_CN[m.skill]} ${skills.level(m.skill)} 级 ${skills.exp(m.skill)}/${skills.needNext(m.skill)}`;
+    el.vein.textContent = `脚边有${m.name}`;
+  } else {
+    const pick = bestPick(inv);
+    el.pick.textContent = pick ? itemName(pick.id) : '空手';
+    el.skill.textContent = `采矿 ${skills.level('mining')} 级 ${skills.exp('mining')}/${skills.needNext('mining')}`;
+    el.vein.textContent = view.near ? '近处无可采' : '—';
+  }
   if (toastLeft > 0) {
     el.toast.textContent = toastText;
     el.toast.style.display = 'block';
@@ -457,6 +557,6 @@ document.getElementById('gear').onclick = () => menuApi.toggle();
 
 // 控制台与自动化用的句柄：window.__iso.view.lookAt(x, y) 之类
 window.__iso = {
-  map, view, veins, terra, inv, skills, scroll, settings, menu: () => menuApi,
+  map, view, veins, nodes, terra, inv, skills, scroll, settings, menu: () => menuApi,
   gather: () => gather,
 };

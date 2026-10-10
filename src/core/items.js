@@ -112,6 +112,77 @@ export const ITEMS = {
   151: { name: '星砂', stack: 64, icon: '✨', color: '#e8d8ff', q: 10 },
 };
 
+// ------------------------------------------------------------------ 采集产出
+// 鱼一百五十种：六十种常见鱼 + 十种修饰配九种鱼身（修饰越玄，品级越高）
+const FISH_BASE = [
+  '鲤鱼', '鲫鱼', '青鱼', '草鱼', '鲢鱼', '鳙鱼', '鳊鱼', '鲂鱼', '鲮鱼', '鲶鱼',
+  '黄颡鱼', '鳜鱼', '鲈鱼', '黑鱼', '黄鳝', '泥鳅', '鲟鱼', '鳇鱼', '白鲟', '餐条鱼',
+  '马口鱼', '赤眼鳟', '翘嘴鱼', '鳡鱼', '回鱼', '黄尾鱼', '银鱼', '太湖银鱼', '沙塘鱼', '乌鱼',
+  '斗鱼', '攀鲈', '罗非鱼', '虹鳟', '哲罗鱼', '细鳞鱼', '白鲑', '狗鱼', '江鳕', '雅罗鱼',
+  '鲥鱼', '刀鱼', '河豚', '松江鲈', '鳗鱼', '花鳗', '白甲鱼', '华鲮', '瓣结鱼', '岩原鲤',
+  '倒刺鱼', '光唇鱼', '厚唇鱼', '红鳍鱼', '青梢鱼', '尖头鱼', '圆口鱼', '大眼鱼', '斑鳜', '暗鳜',
+];
+const FISH_PREFIX = [
+  { p: '青', q: 3 }, { p: '赤', q: 3 }, { p: '银', q: 4 }, { p: '金', q: 5 },
+  { p: '墨', q: 5 }, { p: '玉', q: 6 }, { p: '锦', q: 6 }, { p: '霜', q: 7 },
+  { p: '灵', q: 8 }, { p: '星', q: 9 },
+];
+const FISH_BODY = ['鲤', '鲫', '鳜', '鲈', '鲟', '鳢', '鲑', '鳟', '鲂'];
+const TIER_C = ['#8a8f98', '#9aa7b0', '#7fb069', '#4f9fd4', '#d4a13a',
+  '#c0603a', '#b06bd6', '#7fd0ff', '#d94f6a', '#6fe3d0'];
+
+export const FISH_IDS = [];
+const fishNames = [...FISH_BASE];
+for (const f of FISH_PREFIX) for (const b of FISH_BODY) fishNames.push(f.p + b);
+fishNames.forEach((name, i) => {
+  const q = i < FISH_BASE.length
+    ? 1 + (i % 3)
+    : FISH_PREFIX[Math.floor((i - FISH_BASE.length) / FISH_BODY.length)].q;
+  const id = 152 + i;
+  FISH_IDS.push(id);
+  ITEMS[id] = { name, stack: 32, icon: '🐟', color: TIER_C[q - 1], q, food: 8 + q * 2 };
+});
+
+// 药材四十四味：越靠后越名贵，疗效也越高
+const HERB_NAMES = [
+  '人参', '黄芪', '当归', '白术', '茯苓', '甘草', '川芎', '白芍', '熟地', '山药',
+  '枸杞', '杜仲', '天麻', '三七', '黄连', '黄芩', '黄柏', '桔梗', '柴胡', '前胡',
+  '半夏', '陈皮', '厚朴', '苍术', '泽泻', '木通', '通草', '瞿麦', '地肤子', '薄荷',
+  '荆芥', '防风', '羌活', '独活', '细辛', '白芷', '辛夷', '苍耳', '金银花', '连翘',
+  '板蓝根', '蒲公英', '鱼腥草', '败酱草',
+];
+export const HERB_IDS = [];
+HERB_NAMES.forEach((name, i) => {
+  const q = Math.min(9, 1 + Math.floor(i / 5));
+  const id = 302 + i;
+  HERB_IDS.push(id);
+  ITEMS[id] = { name, stack: 64, icon: '🌿', color: TIER_C[q - 1], q, heal: 4 + q * 3 };
+});
+
+// 良木八种：伐木所得，品级越高越是良材
+const WOOD_NAMES = ['松木', '楠木', '樟木', '杉木', '柏木', '银杏木', '乌木', '紫檀'];
+export const WOOD_IDS = [];
+WOOD_NAMES.forEach((name, i) => {
+  const q = 1 + i;
+  const id = 346 + i;
+  WOOD_IDS.push(id);
+  ITEMS[id] = { name, stack: 64, icon: '🪵', color: TIER_C[Math.min(9, q - 1)], q };
+});
+
+// 狩猎所得
+const BEAST_LOOT = [['兽皮', 2], ['兽筋', 3], ['兽骨', 3], ['兽牙', 5], ['兽血', 4], ['兽胆', 7]];
+export const BEAST_IDS = [];
+BEAST_LOOT.forEach(([name, q], i) => {
+  const id = 354 + i;
+  BEAST_IDS.push(id);
+  ITEMS[id] = { name, stack: 64, icon: '🦴', color: TIER_C[q - 1], q };
+});
+
+// 钓竿：垂钓须持竿，竿越好起竿越快
+ITEMS[360] = { name: '竹钓竿', stack: 1, icon: '🎣', color: '#86bf4e', q: 2, tool: { kind: 'rod', speed: 2.0, tier: 1 } };
+ITEMS[361] = { name: '铁钩竿', stack: 1, icon: '🎣', color: '#cfd6dc', q: 4, tool: { kind: 'rod', speed: 3.2, tier: 2 } };
+ITEMS[362] = { name: '丝纶竿', stack: 1, icon: '🎣', color: '#e0a02a', q: 6, tool: { kind: 'rod', speed: 4.5, tier: 3 } };
+
 /**
  * 十阶品级。品级不只是标签：攻防、回复、效力都按 mul 折算，
  * 所以仙品的铁剑确实比凡品的铁剑强得多。
