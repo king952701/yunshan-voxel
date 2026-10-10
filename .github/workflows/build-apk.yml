@@ -14,6 +14,10 @@ on:
       - 'icon.svg'
       - 'src/**'
       - 'vendor/**'
+      # tools/ 与 package.json 也得算进来：启动门禁就在 tools/ 下，
+      # 门禁自身改了却不出包的话，产物会一直停在门禁坏掉之前那一次
+      - 'tools/**'
+      - 'package.json'
   workflow_dispatch:
 
 jobs:
