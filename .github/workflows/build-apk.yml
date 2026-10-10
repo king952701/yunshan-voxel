@@ -22,6 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 启动门禁：真把 2.5D 入口跑起来再跑几帧。语法过了不等于跑得起来，
+      # 曾经有一次掉进暂时性死区，模块一加载就抛，整页黑屏 —— 这道门就是拦它的
+      - name: boot check
+        run: node tools/boot-check.mjs
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

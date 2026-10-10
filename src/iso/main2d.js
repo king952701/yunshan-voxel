@@ -59,6 +59,12 @@ const surv = new Survival();   // 气血、饱食、渴饮
 const inv = new Inventory();
 const store = new Inventory(STORE_SIZE);   // 仓库一千格
 
+// 钓鱼的那点状态。必须声明在 saveState 之前：const 有暂时性死区，
+// 存档句柄在下面就要读 caught，写反了模块当场抛 ReferenceError，整页黑屏。
+const fish = createFishing();
+let fishSpot = null;                  // 下竿时站在哪，走开两格就自动收竿
+const caught = new Set();             // 钓起过的鱼：鱼类图鉴靠它点亮
+
 // 存档句柄：地形、矿脉、采集点都是按种子确定性生成的，所以只存改动、格子与冷却
 const saveState = {
   inv, store, skills, terra, veins, nodes, view, settings, surv, caught,
@@ -76,9 +82,6 @@ function flushSave(force) {
 let selMat = BRICK;
 let img = null;
 let hover = null;
-const fish = createFishing();
-let fishSpot = null;                  // 下竿时站在哪，走开两格就自动收竿
-const caught = new Set();             // 钓起过的鱼：鱼类图鉴靠它点亮
 let gather = null;      // 正在进行的采集
 let toastText = '', toastLeft = 0;
 let craftOpen = false;

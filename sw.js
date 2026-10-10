@@ -1,5 +1,6 @@
 // 离线缓存：装到桌面或打进 APK 之后，没网也能进山水
-const CACHE = 'yunshan-v4';
+// v5：上一版（v4）缓存里存着一份会黑屏的入口，换名才能让浏览器把旧副本整个丢掉
+const CACHE = 'yunshan-v5';
 // 清单里少一个文件，addAll 就会整包失败（离线进不去），所以新增模块要记着补上
 const ASSETS = [
   './', './index.html', './iso.html', './voxel.html', './selftest.html',
