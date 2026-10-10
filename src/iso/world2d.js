@@ -94,7 +94,8 @@ export function classify(wx, wy, h, slope, seed) {
     if (lakeFactor(wx, wy, seed) > 0.15) return T.GRASS;     // 绿洲
     return cover > 0.38 ? T.SHRUB : T.DUNE;                   // 沙生灌木
   }
-  if (b === LOESS) return cover > 0.34 ? T.GRASS : cover > 0.24 ? T.SHRUB : T.LOESS;
+  // 黄土要看得见土：草与灌木只占一半，塬面大片露着赭黄的土
+  if (b === LOESS) return cover > 0.42 ? T.GRASS : cover > 0.32 ? T.SHRUB : T.LOESS;
   // 草原：也是块与块之间的过渡带
   if (cover > 0.44) return T.FOREST;
   const bamboo = fbm2(wx / (190 * S), wy / (190 * S), seed + 6161, 2);

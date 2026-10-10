@@ -30,7 +30,7 @@ const SECOND_AT = { snow: 0.66, pine: 0.68, grass: 0.66, desert: 0.72, loess: 0.
  */
 export const P = {
   snow: { lift: 15, amp: 11, ridge: 32, snowLine: -13, wet: 0.85, tree: 0.20, shrub: 0.10, sand: 0 },
-  pine: { lift: 5, amp: 10, ridge: 26, snowLine: -1, wet: 1.00, tree: 0.88, shrub: 0.30, sand: 0 },
+  pine: { lift: 5, amp: 10, ridge: 26, snowLine: -1, wet: 0.85, tree: 0.88, shrub: 0.30, sand: 0 },
   grass: { lift: 1, amp: 7, ridge: 13, snowLine: 0, wet: 0.72, tree: 0.16, shrub: 0.52, sand: 0 },
   desert: { lift: 4, amp: 5, ridge: 7, snowLine: 8, wet: 0.30, tree: 0.02, shrub: 0.14, sand: 1 },
   loess: { lift: 3, amp: 9, ridge: 19, snowLine: 2, wet: 0.45, tree: 0.07, shrub: 0.34, sand: 0.25 },
