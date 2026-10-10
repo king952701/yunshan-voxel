@@ -19,6 +19,7 @@ export function createMenu(opts) {
   const wrap = document.createElement('div');
   wrap.className = 'menu-wrap';
   wrap.hidden = true;
+  wrap.style.display = 'none';
   wrap.innerHTML = `
     <div class="menu">
       <div class="menu-head"><b>云山录 · 设置</b><button class="mx" title="关闭">✕</button></div>
@@ -51,7 +52,9 @@ export function createMenu(opts) {
           <p>同一片山川两副看法：<a href="index.html">体素山川（3D）</a>与
              <a href="iso.html">山水长卷（2.5D）</a>，地形由同一套函数生成。</p>
           <p>地形、矿脉、配方均为确定性生成：同一个种子，同一片山水。</p>
-          <p class="note">快捷键：Esc 打开/关闭本菜单，C 开百工谱，E 采矿脉，R 回图心。</p>
+          <p class="note">快捷键：Esc 开关本菜单（点右上角 ✕、或点面板外的暗处也能关），
+             C 开百工谱，E 采矿脉，R 回图心。</p>
+          <p class="note">构建 v4 · 2026-10-10　—— 若这里写的不是 v4，说明浏览器还在用旧缓存。</p>
         </div>
       </div>
     </div>`;
@@ -173,7 +176,11 @@ export function createMenu(opts) {
     b.onclick = () => {
       tab = b.dataset.tab;
       wrap.querySelectorAll('.menu-tabs button').forEach((x) => x.classList.toggle('on', x === b));
-      wrap.querySelectorAll('.pane').forEach((p) => { p.hidden = p.dataset.pane !== tab; });
+      wrap.querySelectorAll('.pane').forEach((p) => {
+        const on = p.dataset.pane === tab;
+        p.hidden = !on;
+        p.style.display = on ? (p.dataset.pane === 'help' ? 'flex' : 'block') : 'none';
+      });
       if (tab === 'help') el.search.focus();
     };
   });
@@ -181,15 +188,24 @@ export function createMenu(opts) {
   wrap.querySelector('.mx').onclick = () => api.close();
   wrap.onclick = (e) => { if (e.target === wrap) api.close(); };
 
+  // 开关一律写内联样式，不靠 CSS 层叠：
+  // 从前只用 hidden 属性，而 .menu-wrap 的 display:flex 会把浏览器的
+  // [hidden]{display:none} 盖掉，于是 ✕ 点了等于没点，面板关不上。
+  // 改成内联之后，就算浏览器手里还攥着旧样式表也压不住。
+  function show(v) {
+    open = v;
+    wrap.hidden = !v;
+    wrap.style.display = v ? 'flex' : 'none';
+  }
+
   const api = {
     open() {
-      open = true;
-      wrap.hidden = false;
+      show(true);
       renderAll();
       renderSettings();
       if (tab === 'help') el.search.focus();
     },
-    close() { open = false; wrap.hidden = true; },
+    close() { show(false); },
     toggle() { open ? api.close() : api.open(); },
     isOpen: () => open,
   };

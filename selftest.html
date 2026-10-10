@@ -30,6 +30,9 @@ f.onload = async () => {
 
     // 1. 开场
     say(disp(wrap) === 'none', '开场菜单是关着的（hidden 压得住 display:flex）', 'display=' + disp(wrap));
+    say(wrap.style.display === 'none', '开场是内联样式关掉的（旧样式表也压不住）',
+      'inline="' + wrap.style.display + '"');
+    say(d.body.textContent.includes('构建 v4'), '关于页写着构建 v4（用来核对是不是旧缓存）');
 
     // 2. 打开
     d.getElementById('gear').click();
@@ -49,9 +52,19 @@ f.onload = async () => {
     await sleep(150);
 
     // 4. 关闭：这是用户报的问题
+    say(wrap.style.display === 'flex', '打开后是内联 flex', 'inline="' + wrap.style.display + '"');
     mx.click();
     await sleep(200);
     say(disp(wrap) === 'none', '点 ✕ 能关掉菜单', 'display=' + disp(wrap));
+    say(wrap.style.display === 'none' && wrap.hidden === true,
+      '点 ✕ 把内联样式与 hidden 一起关掉', 'inline="' + wrap.style.display + '"');
+
+    // 4b. 点面板外的暗处也能关
+    d.getElementById('gear').click();
+    await sleep(150);
+    wrap.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));   // 直接点在遮罩上
+    await sleep(200);
+    say(disp(wrap) === 'none', '点面板外的暗处也能关', 'display=' + disp(wrap));
 
     // 5. 反复开关
     d.getElementById('gear').click();

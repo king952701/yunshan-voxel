@@ -1,5 +1,5 @@
 // 离线缓存：装到桌面或打进 APK 之后，没网也能进山水
-const CACHE = 'yunshan-v3';
+const CACHE = 'yunshan-v4';
 // 清单里少一个文件，addAll 就会整包失败（离线进不去），所以新增模块要记着补上
 const ASSETS = [
   './', './index.html', './iso.html', './voxel.html', './selftest.html',
@@ -30,14 +30,24 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-      if (res && res.status === 200 && res.type === 'basic') {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
-      }
-      return res;
-    }).catch(() => caches.match('./iso.html'))),
-  );
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const mine = new URL(req.url).origin === self.location.origin;
+
+  // 自家文件一律「先问网络，再退缓存」。
+  // 以前是缓存优先，于是修好的版本发上去了，浏览器还在拿旧副本喂你，
+  // 面板关不掉这种问题就会一直犯。断网时照样从缓存起，不影响离线玩。
+  if (mine) {
+    e.respondWith(
+      fetch(req).then((res) => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      }).catch(() => caches.match(req).then((hit) => hit || caches.match('./iso.html'))),
+    );
+    return;
+  }
+  e.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
 });
