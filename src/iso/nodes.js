@@ -2,9 +2,10 @@
 // 与矿脉同构——按坐标确定性生成，采空后冷却，冷却结束自行复生，地形数据不动。
 import { rand2 } from '../core/noise.js';
 import { T } from './palette.js';
+import { biomeParams } from '../core/biome.js';
 import {
   ITEMS, FISH_IDS, HERB_IDS, WOOD_IDS, BEAST_IDS,
-  DIRT, SAND, GRAVEL, BAMBOO, MEAT, BERRY_FRUIT,
+  DIRT, SAND, GRAVEL, BAMBOO, MEAT, BERRY_FRUIT, STICK,
 } from '../core/items.js';
 
 export const NODE_CD = 300;   // 采空后 5 分钟自行复生
@@ -13,6 +14,7 @@ export const NB = 32;         // 每 32x32 片区长出几处采集点
 /** 六类采集点：各自对应一门采集技能与一件趁手家伙 */
 export const KINDS = {
   tree: { name: '树木', skill: 'logging', tool: 'axe', color: '#6b8f4e', icon: '🌲' },
+  shrub: { name: '灌木丛', skill: 'foraging', tool: null, color: '#8a9a5b', icon: '🪴' },
   herb: { name: '药丛', skill: 'herbal', tool: 'sickle', color: '#6fbf5a', icon: '🌿' },
   fish: { name: '钓点', skill: 'fishing', tool: 'rod', color: '#5fa8d3', icon: '🎣' },
   beast: { name: '野兽', skill: 'hunting', tool: 'sword', color: '#c0603a', icon: '🐗' },
@@ -29,6 +31,13 @@ export function nodeLoot(kind, wx, wy, seed, type) {
       if (type === T.BAMBOO) return { id: BAMBOO, count: 2 };
       const i = Math.floor(rand2(wx, wy, seed + 501) * WOOD_IDS.length);
       return { id: WOOD_IDS[i], count: 1 + Math.floor(rand2(wx, wy, seed + 502) * 2) };
+    }
+    case 'shrub': {
+      // 灌木砍下来是木棍，运气好还挂着一把野果
+      if (rand2(wx, wy, seed + 561) < 0.72) {
+        return { id: STICK, count: 2 + Math.floor(rand2(wx, wy, seed + 562) * 2) };
+      }
+      return { id: BERRY_FRUIT, count: 1 };
     }
     case 'herb': {
       // 越靠后的药越名贵，也越少：把随机数取幂，名贵的自然落进长尾
@@ -58,18 +67,30 @@ export function nodeLoot(kind, wx, wy, seed, type) {
 
 // 每类点长在什么地表上
 const GROUND = {
-  tree: (t) => t === T.FOREST || t === T.BAMBOO || t === T.GRASS,
-  herb: (t) => t === T.GRASS || t === T.FOREST || t === T.BANK,
+  tree: (t) => t === T.FOREST || t === T.BAMBOO || t === T.GRASS || t === T.PINE,
+  shrub: (t) => t === T.SHRUB || t === T.GRASS || t === T.LOESS || t === T.DUNE,
+  herb: (t) => t === T.GRASS || t === T.FOREST || t === T.BANK || t === T.SHRUB,
   fish: (t) => t === T.WATER || t === T.DEEP,
-  beast: (t) => t === T.FOREST || t === T.GRASS || t === T.BAMBOO,
-  soil: (t) => t === T.SAND || t === T.BANK || t === T.ROCK,
-  berry: (t) => t === T.GRASS || t === T.FOREST || t === T.BAMBOO,
+  beast: (t) => t === T.FOREST || t === T.GRASS || t === T.BAMBOO || t === T.PINE,
+  soil: (t) => t === T.SAND || t === T.BANK || t === T.ROCK || t === T.DUNE || t === T.LOESS,
+  berry: (t) => t === T.GRASS || t === T.FOREST || t === T.BAMBOO || t === T.SHRUB,
 };
 
 const PLAN = [
-  ['tree', 3, 5], ['herb', 1, 3], ['fish', 1, 3],
+  ['tree', 3, 5], ['shrub', 1, 3], ['herb', 1, 3], ['fish', 1, 3],
   ['beast', 0, 1], ['soil', 1, 2], ['berry', 1, 2],
 ];
+
+// 疏密随地貌：松林里树挨着树，沙漠里几乎不生木，水泽之乡鱼与药都多
+const BIOME_MUL = {
+  tree: (p) => p.tree * 2.4,
+  shrub: (p) => 0.4 + p.shrub * 1.6,
+  herb: (p) => 0.5 + p.wet,
+  fish: (p) => 0.4 + p.wet * 1.4,
+  beast: (p) => 0.3 + p.tree * 1.2,
+  soil: (p) => 0.4 + p.sand * 1.6,
+  berry: (p) => 0.5 + p.shrub,
+};
 
 export class Nodes {
   constructor(map) {
@@ -83,8 +104,10 @@ export class Nodes {
     let v = this.chunks.get(key);
     if (v) return v;
     v = [];
+    const p = biomeParams(bx * NB + NB / 2, by * NB + NB / 2, this.seed);
     PLAN.forEach(([kind, lo, hi], ki) => {
-      const n = lo + Math.floor(rand2(bx, by, this.seed + 6301 + ki) * (hi - lo + 1));
+      const base = lo + Math.floor(rand2(bx, by, this.seed + 6301 + ki) * (hi - lo + 1));
+      const n = Math.round(base * BIOME_MUL[kind](p));
       for (let i = 0; i < n; i++) {
         const wx = bx * NB + Math.floor(rand2(bx, i, this.seed + 6401 + ki) * NB);
         const wy = by * NB + Math.floor(rand2(by, i, this.seed + 6501 + ki) * NB);

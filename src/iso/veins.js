@@ -3,12 +3,18 @@
 import { fbm2, rand2 } from '../core/noise.js';
 import { SEA } from './palette.js';
 import { STONE, ORE_COAL, ORE_IRON } from '../core/items.js';
+import { mineAt } from '../core/biome.js';
 
 // 写实矿物为主，掺入灵矿；灵矿罕见，是高阶器物与符箓的根基
 export const COPPER = 137, CINNABAR = 136, JADE = 135, TIN = 138, REALGAR = 139,
   SULPHUR = 140, SALT = 141, CRYSTAL = 142, AGATE = 143, JADEITE = 144,
   GOLD = 145, SILVER = 146, SPIRIT = 147, BLACK_IRON = 148, BLOOD_JADE = 149,
-  THUNDER = 150, STARDUST = 151;
+  THUNDER = 150, STARDUST = 151, ALUM = 363;
+
+/** 五金矿山：金山、银山、铁矿山、铜矿山、铝矿山 —— 各自的成片矿区 */
+export const MINE_ORE = {
+  gold: GOLD, silver: SILVER, iron: ORE_IRON, copper: COPPER, alum: ALUM,
+};
 
 /** 二十种矿脉：tier 是开采所需的最低镐级，exp 是每次采集给的采矿经验，q 是品级 */
 export const ORES = [
@@ -16,6 +22,7 @@ export const ORES = [
   { id: ORE_COAL, name: '煤矿', color: 0x464b52, tier: 1, exp: 10, count: 2, q: 1 },
   { id: ORE_IRON, name: '铁矿', color: 0xd08a4a, tier: 2, exp: 15, count: 2, q: 2 },
   { id: COPPER, name: '铜矿', color: 0xb87333, tier: 2, exp: 18, count: 2, q: 2 },
+  { id: ALUM, name: '铝矿', color: 0xb8c4cc, tier: 2, exp: 30, count: 2, q: 3 },
   { id: TIN, name: '锡矿', color: 0xb0b7bd, tier: 2, exp: 20, count: 2, q: 2 },
   { id: SALT, name: '井盐', color: 0xe8e2d6, tier: 1, exp: 14, count: 3, q: 2 },
   { id: CINNABAR, name: '朱砂', color: 0xc0392b, tier: 2, exp: 24, count: 2, q: 3 },
@@ -37,6 +44,16 @@ export const ORES = [
 const ORE_BY_ID = new Map(ORES.map((o) => [o.id, o]));
 export function oreInfo(id) { return ORE_BY_ID.get(id) || ORES[0]; }
 
+// 稀有度阶梯：累积概率 → 矿种。五金（铁铜铝）居中，灵矿在长尾
+const LADDER = [
+  [0.180, STONE], [0.340, ORE_COAL], [0.460, ORE_IRON], [0.545, COPPER],
+  [0.590, ALUM], [0.660, TIN], [0.720, SALT], [0.775, CINNABAR],
+  [0.820, REALGAR], [0.862, SULPHUR], [0.895, CRYSTAL], [0.922, AGATE],
+  [0.943, SILVER], [0.958, JADE], [0.970, GOLD], [0.979, JADEITE],
+  [0.9855, SPIRIT], [0.9910, BLACK_IRON], [0.9950, BLOOD_JADE],
+  [0.9975, THUNDER], [1, STARDUST],
+];
+
 export const VEIN_CD = 300;   // 采空后 5 分钟自行复生
 export const BASE_TIME = 5;   // 一次采集 5 秒（技能与镐会缩短）
 export const FX_TIME = 1.2;   // 消失动画时长
@@ -50,32 +67,20 @@ export function oreAt(wx, wy, seed) {
   const field = fbm2(wx / 46, wy / 46, seed + 8801, 3);
   if (field < 0.50) return 0;
   if (rand2(wx, wy, seed + 8802) > 0.50) return 0;
+  // 矿山里整座山都是那一种金属；成色越好越纯
+  const mine = mineAt(wx, wy, seed);
+  if (mine && rand2(wx, wy, seed + 8807) < mine.w * 0.5) return MINE_ORE[mine.key];
   // 越往下越罕见：常见石煤占大头，灵矿万中无一
   const k = rand2(wx, wy, seed + 8803);
-  if (k < 0.180) return STONE;
-  if (k < 0.340) return ORE_COAL;
-  if (k < 0.460) return ORE_IRON;
-  if (k < 0.555) return COPPER;
-  if (k < 0.635) return TIN;
-  if (k < 0.700) return SALT;
-  if (k < 0.760) return CINNABAR;
-  if (k < 0.810) return REALGAR;
-  if (k < 0.855) return SULPHUR;
-  if (k < 0.892) return CRYSTAL;
-  if (k < 0.922) return AGATE;
-  if (k < 0.945) return SILVER;
-  if (k < 0.962) return JADE;
-  if (k < 0.974) return GOLD;
-  if (k < 0.983) return JADEITE;
-  if (k < 0.9895) return SPIRIT;
-  if (k < 0.994) return BLACK_IRON;
-  if (k < 0.9968) return BLOOD_JADE;
-  if (k < 0.9986) return THUNDER;
+  for (const [at, id] of LADDER) if (k < at) return id;
   return STARDUST;
 }
 
 /** 露头处的矿种：矿区里出该区的矿，矿区之外也有零散的石材与煤，只是不富集 */
 export function veinOreAt(wx, wy, seed) {
+  // 矿山上的露头，多半就是这座山的金属
+  const mine = mineAt(wx, wy, seed);
+  if (mine && rand2(wx, wy, seed + 8806) < 0.55 + mine.w * 0.35) return MINE_ORE[mine.key];
   const o = oreAt(wx, wy, seed);
   if (o) return o;
   const k = rand2(wx, wy, seed + 8805);
@@ -100,8 +105,11 @@ export class Veins {
     let v = this.blocks.get(key);
     if (v) return v;
     v = [];
+    // 矿山上露头格外密，一座山能采出一片来
+    const mine = mineAt(bx * VB + VB / 2, by * VB + VB / 2, this.seed);
+    const bonus = mine ? Math.round(mine.w * 3) : 0;
     const roll = rand2(bx, by, this.seed + 9101);
-    const n = roll < 0.28 ? 0 : roll < 0.78 ? 1 : 2;   // 平均约每片区一处
+    const n = (roll < 0.28 ? 0 : roll < 0.78 ? 1 : 2) + bonus;   // 平均约每片区一处
     for (let i = 0; i < n; i++) {
       const wx = bx * VB + Math.floor(rand2(bx, i, this.seed + 9102) * VB);
       const wy = by * VB + Math.floor(rand2(by, i, this.seed + 9103) * VB);

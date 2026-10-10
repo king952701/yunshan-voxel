@@ -3,13 +3,14 @@
 import {
   ITEMS, BLOCKS, QUALITY, qualityOf, itemName, itemColor, itemIcon,
 } from '../core/items.js';
-import { ORES, VEIN_CD, BASE_TIME } from './veins.js';
+import { ORES, VEIN_CD, BASE_TIME, MINE_ORE, oreInfo } from './veins.js';
 import { KINDS, NODE_CD, NB } from './nodes.js';
 import { SKILLS, SKILL_BY_KEY } from './skill.js';
 import { ALL_RECIPES, CATEGORIES, CRAFT_CATS } from '../game/crafting.js';
 import { BUILD_MATS } from './edit2d.js';
 import { WORLD } from './world2d.js';
 import { SEA, SNOW_LINE } from './palette.js';
+import { BIOME_NAME, BLOCK_BIOME, REGION, MINE_KEYS, MINE_NAME } from '../core/biome.js';
 
 /** 索引分类 */
 export const CATS = [
@@ -158,18 +159,69 @@ export function buildCodex(skills) {
     out.push({ cat: 'control', title: `${k}　${t}`, sub: '操作', body: d, tags: `${k} ${t} 操作 按键 帮助` });
   }
 
-  const n = WORLD.N || 8000;
+  const n = WORLD;
+  const quarters = [];
+  for (let bi = 0; bi < BLOCK_BIOME.length; bi++) {
+    for (let bj = 0; bj < BLOCK_BIOME[bi].length; bj++) {
+      quarters.push(`${bi === 0 ? '北' : '南'}${bj === 0 ? '西' : '东'}：${BIOME_NAME[BLOCK_BIOME[bi][bj]]}`);
+    }
+  }
   out.push({
     cat: 'world', title: '云山图幅',
-    sub: `${n} × ${n} 格`,
-    body: `一图共 ${(n * n / 1e6).toFixed(0)} 百万格，海平面 ${SEA}，雪线 ${SNOW_LINE}。`
+    sub: `${n} × ${n} 格 · 四块大区`,
+    body: `整幅山水由四块不规则的大区拼成，每块 ${REGION} × ${REGION} 格：${quarters.join('、')}。`
+      + `块与块之间是草原过渡带，分界由噪声扭曲，所以不是直来直去的方格。`
+      + `一图共 ${(n * n / 1e6).toFixed(0)} 百万格，海平面 ${SEA}，雪线 ${SNOW_LINE}；`
       + `地形由纯函数生成，走到哪算到哪，改动另存一层，所以原始山水永远不会被写坏。`,
-    tags: '世界 图幅 山川 地形 海平面 雪线',
+    tags: '世界 图幅 山川 地形 海平面 雪线 大区 地貌',
   });
+
+  // 五种地貌
+  const BIOME_DESC = {
+    snow: '高处终年积雪，雪线比别处低得多，只有背风的坡上长着成片的松林。',
+    pine: '丘陵连着丘陵，松林一望无际，林下多药丛与野兽，是伐木的好去处。',
+    grass: '平缓草场，也是块与块之间的过渡带；水边竹林与灌木最密。',
+    desert: '平旷少雨，满眼沙丘；低洼处偶尔汇成绿洲，湖边才见草与灌木。',
+    loess: '黄土塬被雨水切出道道沟壑，陡处露崖，塬面上草与灌木相间。',
+  };
+  for (const key of Object.keys(BIOME_NAME)) {
+    out.push({
+      cat: 'world', title: `地貌 · ${BIOME_NAME[key]}`,
+      sub: key === 'grass' ? '过渡带 · 亦成片出现' : `一块 ${REGION} × ${REGION}`,
+      body: BIOME_DESC[key],
+      tags: `地貌 ${BIOME_NAME[key]} 大区 地形 山川`,
+    });
+  }
+
+  // 水系：江、溪、湖
+  const WATERS = [
+    ['河流', '大江横贯全图，河心最深，两岸留河滩；沿河最宜安家，走兽也来饮水。'],
+    ['小溪', '细密支流，比江窄得多也多得多，顺着山脊蜿蜒；溪畔多是灌木与药丛。'],
+    ['湖泊', '低洼处积水成湖，湖心最深；沙漠里的湖就是绿洲，湖边才长出草来。'],
+  ];
+  for (const [name, body] of WATERS) {
+    out.push({
+      cat: 'world', title: `水系 · ${name}`, sub: '随机生成', body,
+      tags: `水系 ${name} 水 地图 河流 湖泊`,
+    });
+  }
+
+  // 五金矿山
+  for (const key of MINE_KEYS) {
+    const ore = oreInfo(MINE_ORE[key]);
+    out.push({
+      cat: 'world', title: `矿山 · ${MINE_NAME[key]}`,
+      sub: `出${ore.name}`,
+      body: `低频噪声圈出成片的矿区，一座${MINE_NAME[key]}的露头格外密，区内多半就是${ore.name}。`
+        + `须持${PICK_CN[ore.tier] || '矿镐'}以上，采空后五分钟自行复生。`,
+      tags: `矿山 ${MINE_NAME[key]} ${ore.name} 矿脉 五金`,
+    });
+  }
+
   out.push({
     cat: 'world', title: '矿脉分布',
     sub: '约每千格一处露头',
-    body: `二十种矿脉，按坐标确定性生成：低频噪声先圈出成片矿区，再在区内落矿，`
+    body: `${ORES.length} 种矿脉，按坐标确定性生成：低频噪声先圈出成片矿区，再在区内落矿，`
       + `所以矿是一脉一脉的。常见石煤占大头，灵矿万中无一。`,
     tags: '矿脉 分布 采集点 灵矿',
   });

@@ -6,6 +6,7 @@ const ASSETS = [
   './manifest.json', './icon.svg',
   './vendor/three.module.js',
   './src/main.js', './src/core/items.js', './src/core/noise.js', './src/core/terrain.js',
+  './src/core/biome.js',
   './src/game/crafting.js', './src/game/craftgen.js', './src/game/inventory.js',
   './src/game/player.js', './src/game/enemies.js', './src/game/survival.js',
   './src/ui/hud.js', './src/ui/closer.js',

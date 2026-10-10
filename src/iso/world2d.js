@@ -1,12 +1,13 @@
-// 8000 x 8000 的中式山水：高度与地表都是 (坐标 + 种子) 的纯函数，
-// 按需分块生成并缓存，绝不预先展开 6400 万格。
-import { surfaceHeight, riverFactor } from '../core/terrain.js';
+// 中式山水：高度与地表都是 (坐标 + 种子) 的纯函数，
+// 按需分块生成并缓存，绝不预先展开几亿格。
+// 图幅与地貌分区读 core/biome.js：四块 8000×8000 的不规则大区。
+import { surfaceHeight, riverFactor, streamFactor, lakeFactor } from '../core/terrain.js';
 import { fbm2, clamp } from '../core/noise.js';
 import { SEA, SNOW_LINE, T, surfaceRGB } from './palette.js';
 import { blockBaseColor } from '../core/items.js';
+import { WORLD, HALF, S, biomeParams, SNOW, PINE, DESERT, LOESS } from '../core/biome.js';
 
-export const WORLD = 8000;
-export const HALF = WORLD / 2;
+export { WORLD, HALF };
 const CH = 64;              // 区块边长（格）
 const MAX_CHUNKS = 1200;    // 缓存上限，超出按生成顺序淘汰
 
@@ -70,23 +71,40 @@ export class Map2D {
   }
 }
 
+/**
+ * 地表分类：先按高度定水陆，再按所在地貌定植被。
+ * 同一片植被噪声，雪原、松林、草原、沙漠、黄土的门槛各不相同，
+ * 所以五块地方各有各的长相，而不是一张绿图刷到底。
+ */
 export function classify(wx, wy, h, slope, seed) {
   if (h <= SEA - 3) return T.DEEP;
   if (h <= SEA) return T.WATER;
-  if (h <= SEA + 2) return T.SAND;
-  if (h >= SNOW_LINE) return T.SNOW;
-  // 这套地形整体平缓（相邻高差常在 1 格以内），崖壁阈值按实测坡度标定
-  if (slope > 1.8) return T.ROCK;
-  if (riverFactor(wx, wy, seed) > 0.05) return T.BANK;
-  const bamboo = fbm2(wx / 190, wy / 190, seed + 6161, 2);
-  if (bamboo > 0.635) return T.BAMBOO;
-  const m = fbm2(wx / 300, wy / 300, seed + 313, 2);
-  return m > 0.53 ? T.FOREST : T.GRASS;
+  const p = biomeParams(wx, wy, seed);
+  const b = p.biome;
+  if (h <= SEA + 2) return p.sand > 0.5 ? T.DUNE : T.SAND;   // 水边滩地
+  if (h >= SNOW_LINE + p.snowLine) return T.SNOW;
+  // 这套地形整体平缓（相邻高差常在 1 格以内），崖壁阈值按实测坡度标定；黄土多沟壑，更容易露崖
+  if (slope > (b === LOESS ? 2.6 : 1.8)) return T.ROCK;
+  if (riverFactor(wx, wy, seed) > 0.05 || streamFactor(wx, wy, seed) > 0.10) return T.BANK;
+  const veg = fbm2(wx / (300 * S), wy / (300 * S), seed + 313, 2);
+  const cover = veg * (0.5 + p.tree);
+  if (b === PINE) return cover > 0.34 ? T.PINE : cover > 0.26 ? T.FOREST : T.GRASS;
+  if (b === SNOW) return cover > 0.50 ? T.PINE : T.SNOW;
+  if (b === DESERT) {
+    if (lakeFactor(wx, wy, seed) > 0.15) return T.GRASS;     // 绿洲
+    return cover > 0.38 ? T.SHRUB : T.DUNE;                   // 沙生灌木
+  }
+  if (b === LOESS) return cover > 0.34 ? T.GRASS : cover > 0.24 ? T.SHRUB : T.LOESS;
+  // 草原：也是块与块之间的过渡带
+  if (cover > 0.44) return T.FOREST;
+  const bamboo = fbm2(wx / (190 * S), wy / (190 * S), seed + 6161, 2);
+  if (bamboo > 0.635 && p.wet > 0.6) return T.BAMBOO;
+  return cover > 0.36 ? T.SHRUB : T.GRASS;
 }
 
 // ------------------------------------------------------------------ 长卷
 /**
- * 把 8000x8000 按 45° 等距投影压成一张像素长卷（最小像素格）。
+ * 把整幅山水按 45° 等距投影压成一张像素长卷（最小像素格）。
  * 逐行分帧生成，先出上卷、逐渐向下展开，避免长时间白屏。
  */
 export const OUTSIDE = 255;   // 图幅之外：留宣纸白边，像画卷的天地头

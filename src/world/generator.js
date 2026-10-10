@@ -2,6 +2,7 @@
 // 因此相邻区块边界天然连续，不存在接缝。
 import { noise3, clamp, rand2 } from '../core/noise.js';
 import { surfaceHeight, riverFactor, slopeAt, biomeAt, SEA, SNOW_LINE } from '../core/terrain.js';
+import { biomeNameAt, DESERT } from '../core/biome.js';
 import {
   AIR, GRASS, DIRT, STONE, SAND, WATER, SNOW, GRAVEL, ORE_COAL, ORE_IRON,
 } from './blocks.js';
@@ -29,6 +30,8 @@ export function generateChunkData(cx, cz, seed) {
       let h = Math.round(surfaceHeight(wx, wz, seed));
       h = clamp(Math.round(h), 3, HEIGHT - 14);
       heights[z * CHUNK + x] = h;
+      // 沙漠那块大区连地下都是沙，与 2.5D 长卷看到的是同一片山川
+      const arid = biomeNameAt(wx, wz, seed) === DESERT;
 
       const beach = h <= SEA + 1;
       const snowy = h >= SNOW_LINE;
@@ -40,9 +43,9 @@ export function generateChunkData(cx, cz, seed) {
         if (y <= 2) {
           id = STONE; // 世界底部，挖不穿
         } else if (y === h) {
-          id = beach ? SAND : snowy ? SNOW : rocky ? STONE : GRASS;
+          id = beach || arid ? SAND : snowy ? SNOW : rocky ? STONE : GRASS;
         } else if (y > h - 4) {
-          id = beach ? SAND : rocky && y > h - 2 ? GRAVEL : DIRT;
+          id = beach || arid ? SAND : rocky && y > h - 2 ? GRAVEL : DIRT;
         } else {
           id = STONE;
         }

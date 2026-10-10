@@ -1,28 +1,31 @@
-// 地形纯函数：只依赖噪声，不碰方块表，因此 3D 体素版与 2.5D 长卷版可以共用同一套山水。
-import { fbm2, ridged2, noise2, smoothstep, clamp } from './noise.js';
+// 地形纯函数：只依赖噪声与地貌分区，不碰方块表，因此 3D 体素版与 2.5D 长卷版可以共用同一套山水。
+import { fbm2, ridged2, smoothstep, clamp } from './noise.js';
+import {
+  S, biomeParams, biomeNameAt,
+  riverFactor, streamFactor, lakeFactor, waterCarve,
+  PINE, SNOW,
+} from './biome.js';
 
 export const SEA = 28;          // 水面高度
 export const SNOW_LINE = 58;    // 雪线
 
-/** 地表高度（整数格）。地形主体：起伏丘陵 + 层叠山峦 */
-export function surfaceHeight(wx, wz, seed) {
-  const cont = fbm2(wx / 520, wz / 520, seed, 4);
-  const hill = fbm2(wx / 120, wz / 120, seed + 555, 4);
-  const ridge = ridged2(wx / 240, wz / 240, seed + 999, 4);
-  const mountain = smoothstep(0.46, 0.72, cont);
-  let h = SEA + 2 + hill * 10 + mountain * (ridge * 42 - 4);
-  h -= riverFactor(wx, wz, seed) * (13 + hill * 6);
-  h += (fbm2(wx / 26, wz / 26, seed + 4242, 2) - 0.5) * 2.2;
-  return h;
-}
+export { riverFactor, streamFactor, lakeFactor };
 
-/** 河道因子：0 = 陆地，1 = 河心。用域扭曲做出蜿蜒的河 */
-export function riverFactor(wx, wz, seed) {
-  const wx2 = wx + (noise2(wx / 170, wz / 170, seed + 31) - 0.5) * 70;
-  const wz2 = wz + (noise2(wx / 170 + 5.5, wz / 170, seed + 61) - 0.5) * 70;
-  const v = fbm2(wx2 / 420, wz2 / 420, seed + 777, 2);
-  const d = Math.abs(v - 0.5);
-  return smoothstep(0.030, 0.004, d);
+/**
+ * 地表高度（整数格）。
+ * 山形是共用的（丘陵 + 层叠山峦），起伏的脾气由所在地貌决定：
+ * 雪原高而多雪、松林多丘陵、草原平缓、沙漠平而少雨、黄土多沟壑。
+ */
+export function surfaceHeight(wx, wz, seed) {
+  const p = biomeParams(wx, wz, seed);
+  const cont = fbm2(wx / (520 * S), wz / (520 * S), seed, 4);
+  const hill = fbm2(wx / (120 * S), wz / (120 * S), seed + 555, 4);
+  const ridge = ridged2(wx / (240 * S), wz / (240 * S), seed + 999, 4);
+  const mountain = smoothstep(0.46, 0.72, cont);
+  let h = SEA + 2 + p.lift + hill * (4 + p.amp) + mountain * (ridge * p.ridge - 4);
+  h -= waterCarve(wx, wz, seed, p);          // 江、溪、湖把地切开
+  h += (fbm2(wx / 26, wz / 26, seed + 4242, 2) - 0.5) * 2.2;   // 细颗粒
+  return h;
 }
 
 export function slopeAt(wx, wz, seed) {
@@ -31,11 +34,16 @@ export function slopeAt(wx, wz, seed) {
     + Math.abs(surfaceHeight(wx, wz + 1, seed) - h);
 }
 
+/**
+ * 粗分类：3D 版的村寨、古塔按这个选地方，沿用旧名，免得那边跟着改。
+ * 2.5D 的长卷不读它，走 palette 的细分类。
+ */
 export function biomeAt(wx, wz, seed, h) {
   if (h <= SEA + 1) return 'water';
+  const b = biomeNameAt(wx, wz, seed);
   if (h >= SNOW_LINE - 4) return 'mountain';
   if (riverFactor(wx, wz, seed) > 0.08) return 'riverbank';
-  return fbm2(wx / 300, wz / 300, seed + 313, 2) > 0.53 ? 'forest' : 'plain';
+  return (b === PINE || b === SNOW) ? 'forest' : 'plain';
 }
 
 export { clamp };
