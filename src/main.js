@@ -16,6 +16,9 @@ import { addClose } from './ui/closer.js';
 const params = new URLSearchParams(location.search);
 const SEED = Number(params.get('seed') || 20261010) | 0;
 const SAVE_KEY = 'yunshan_v1_state';
+// 地形版本：整幅山水换成十二区 + 四面环海之后，旧档的落点是照旧地图站的地方，
+// 可能已经埋在新山里或者沉进南海，所以地形版本对不上就重新挑一处落脚，行囊照旧留住
+const WORLD_VER = 2;
 
 // ------------------------------------------------------------------ 渲染
 const canvas = document.getElementById('game');
@@ -107,7 +110,7 @@ function save() {
     hp: player.hp, hunger: player.hunger, armor: player.armor,
     time: survival.time, day: survival.day,
     yaw: player.yaw, pitch: player.pitch,
-    inv: inv.serialize(), seed: SEED,
+    inv: inv.serialize(), seed: SEED, wv: WORLD_VER,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* 忽略 */ }
   world.saveEdits();
@@ -124,7 +127,14 @@ function load() {
     player.yaw = d.yaw || 0; player.pitch = d.pitch || -0.15;
     survival.time = d.time; survival.day = d.day || 1;
     inv.deserialize(d.inv);
-    spawn = { x: d.x, y: d.y, z: d.z };
+    if (d.wv !== WORLD_VER) {
+      // 旧地图的落点不作数了，重新挑一处「有起伏、看得见山」的落脚地
+      const s = findSpawn();
+      player.pos.set(s.x, s.y, s.z);
+      spawn = { x: s.x, y: s.y, z: s.z };
+    } else {
+      spawn = { x: d.x, y: d.y, z: d.z };
+    }
     return true;
   } catch (e) { return false; }
 }

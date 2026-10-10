@@ -4,7 +4,8 @@ import { CHUNK, HEIGHT, generateChunkData, index } from './generator.js';
 import { buildChunkGeometry, geometryFrom } from './chunk.js';
 import { AIR, WATER, BLOCKS } from './blocks.js';
 
-const SAVE_KEY = 'yunshan_v1_edits';
+const SAVE_KEY = 'yunshan_v2_edits';
+const OLD_KEY = 'yunshan_v1_edits';   // 地形改版前那一版改动层，见到了就删掉，别让旧方块留在岛上
 
 export function createMaterials(atlas) {
   const opaque = new THREE.MeshLambertMaterial({
@@ -38,6 +39,7 @@ export class World {
   key(cx, cz) { return cx + ',' + cz; }
 
   loadEdits() {
+    try { localStorage.removeItem(OLD_KEY); } catch (e) { /* 本来就没有 */ }
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return;

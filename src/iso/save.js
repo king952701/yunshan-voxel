@@ -6,7 +6,12 @@ import { VB } from './veins.js';
 import { NB } from './nodes.js';
 
 export const SAVE_KEY = 'yunshan2d.save.v1';
-const VER = 1;
+/**
+ * 存档版本。VER 2 是地形改版（十二区 + 四面环海）之后：
+ * 旧档里「动土」那一层记的是旧地图的绝对高度，矿脉与采集点的冷却是旧坐标，
+ * 相机更停在已经不存在的旧位置上 —— 这些一律作废，行囊、仓库、技艺照旧带走。
+ */
+const VER = 2;
 
 /** 本地存储：隐私模式或某些 webview 里会抛异常，一律吞掉 */
 function ls() {
@@ -62,29 +67,47 @@ export function capture(o) {
 }
 
 export function restore(o, data) {
-  if (!data || data.v !== VER) return false;
+  if (!data) return false;
+  if (data.v > VER) return false;                 // 更高版本（将来的档）读不了
+  // 旧地形留下的档：只带人，不带地图。动土、冷却、相机全是照旧地图记的，留着就是补丁
+  const stale = data.v < VER;
   const { inv, store, skills, terra, veins, nodes, view, settings } = o;
 
   unpackSlots(inv, data.bag);
   unpackSlots(store, data.store);
 
+  // lv 与 xp 分开判空：老档可能只有一半，读进来就崩在半路上
   if (data.sk) {
-    for (const k of Object.keys(skills.lv)) {
-      if (data.sk.lv[k] != null) skills.lv[k] = data.sk.lv[k];
-      if (data.sk.xp[k] != null) skills.xp[k] = data.sk.xp[k];
+    if (data.sk.lv) {
+      for (const k of Object.keys(skills.lv)) {
+        if (data.sk.lv[k] != null) skills.lv[k] = data.sk.lv[k];
+      }
+    }
+    if (data.sk.xp) {
+      for (const k of Object.keys(skills.xp)) {
+        if (data.sk.xp[k] != null) skills.xp[k] = data.sk.xp[k];
+      }
     }
   }
 
   terra.deltas.clear();
-  for (const e of data.terra || []) terra.deltas.set(e[0], { h: e[1], t: e[2], mat: e[3] });
+  if (!stale) {
+    for (const e of data.terra || []) terra.deltas.set(e[0], { h: e[1], t: e[2], mat: e[3] });
 
-  for (const e of data.vcd || []) {
-    const arr = veins.nodesIn(Math.floor(e[0] / VB), Math.floor(e[1] / VB));
-    for (const p of arr) if (p.wx === e[0] && p.wy === e[1]) p.cd = e[2];
-  }
-  for (const e of data.ncd || []) {
-    const arr = nodes.chunkAt(Math.floor(e[0] / NB), Math.floor(e[1] / NB));
-    for (const p of arr) if (p.wx === e[0] && p.wy === e[1]) p.cd = e[2];
+    for (const e of data.vcd || []) {
+      const arr = veins.nodesIn(Math.floor(e[0] / VB), Math.floor(e[1] / VB));
+      for (const p of arr) if (p.wx === e[0] && p.wy === e[1]) p.cd = e[2];
+    }
+    for (const e of data.ncd || []) {
+      const arr = nodes.chunkAt(Math.floor(e[0] / NB), Math.floor(e[1] / NB));
+      for (const p of arr) if (p.wx === e[0] && p.wy === e[1]) p.cd = e[2];
+    }
+    if (data.cam) {
+      view.zi = data.cam[0] || 0;
+      view.camPX = data.cam[1] || 0;
+      view.camPY = data.cam[2] || 0;
+      view.clampCam();
+    }
   }
 
   if (data.mat != null && o.setMat) o.setMat(data.mat);
@@ -94,12 +117,6 @@ export function restore(o, data) {
     o.surv.water = data.surv.water;
   }
   if (data.set) Object.assign(settings, data.set);
-  if (data.cam) {
-    view.zi = data.cam[0] || 0;
-    view.camPX = data.cam[1] || 0;
-    view.camPY = data.cam[2] || 0;
-    view.clampCam();
-  }
   return true;
 }
 
