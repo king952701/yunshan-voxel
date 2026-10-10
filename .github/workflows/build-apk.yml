@@ -1,0 +1,58 @@
+name: build-apk
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+      - 'index.html'
+      - 'iso.html'
+      - 'voxel.html'
+      - 'manifest.json'
+      - 'sw.js'
+      - 'icon.svg'
+      - 'src/**'
+      - 'vendor/**'
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: sync web assets
+        run: |
+          set -e
+          mkdir -p android/app/src/main/assets
+          for f in index.html iso.html voxel.html manifest.json sw.js icon.svg; do
+            cp "$f" android/app/src/main/assets/
+          done
+          rsync -a --delete src vendor android/app/src/main/assets/
+          ls -1 android/app/src/main/assets
+
+      - name: build
+        working-directory: android
+        run: gradle --no-daemon assembleDebug assembleRelease
+
+      - name: collect
+        run: |
+          mkdir -p out
+          find android/app/build/outputs/apk -name '*.apk' -exec cp {} out/ \;
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yunshan-apk
+          path: out/*.apk
+          if-no-files-found: error

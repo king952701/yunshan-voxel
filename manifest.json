@@ -2,7 +2,7 @@
   "name": "云山录 · 山水长卷",
   "short_name": "云山录",
   "description": "八千格中式山水，挖地营建、采矿采药、八百式百工",
-  "start_url": "./iso.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "landscape",
