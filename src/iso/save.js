@@ -41,7 +41,7 @@ function unpackSlots(inv, list) {
 }
 
 export function capture(o) {
-  const { inv, store, skills, terra, veins, nodes, view, settings, mat, surv } = o;
+  const { inv, store, skills, terra, veins, nodes, view, settings, mat, surv, caught } = o;
 
   const deltas = [];
   for (const [k, d] of terra.deltas) deltas.push([k, d.h, d.t, d.mat || 0]);
@@ -63,6 +63,7 @@ export function capture(o) {
     surv: surv ? { hp: surv.hp, food: surv.food, water: surv.water } : null,
     cam: [view.zi, Math.round(view.camPX), Math.round(view.camPY)],
     terra: deltas, vcd, ncd,
+    fish: caught ? [...caught] : [],        // 钓起过的鱼：鱼类图鉴的收藏记录
   };
 }
 
@@ -88,6 +89,12 @@ export function restore(o, data) {
         if (data.sk.xp[k] != null) skills.xp[k] = data.sk.xp[k];
       }
     }
+  }
+
+  // 渔获是人的记录，不是地图的东西，所以旧档也照旧带过来
+  if (o.caught && Array.isArray(data.fish)) {
+    o.caught.clear();
+    for (const id of data.fish) o.caught.add(id);
   }
 
   terra.deltas.clear();

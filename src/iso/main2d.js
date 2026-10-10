@@ -9,6 +9,7 @@ import {
   Terra, Inventory, startingKit, BUILD_MATS, bestPick, bestTool, STORE_SIZE,
 } from './edit2d.js';
 import { Veins, oreInfo, FX_TIME, BASE_TIME } from './veins.js';
+import { createFishing, waterNear, PHASE, rodPower } from './fishing.js';
 import { Nodes, KINDS, kindInfo, NODE_CD } from './nodes.js';
 import { Skills, SKILLS, gatherTime } from './skill.js';
 import {
@@ -60,7 +61,7 @@ const store = new Inventory(STORE_SIZE);   // 仓库一千格
 
 // 存档句柄：地形、矿脉、采集点都是按种子确定性生成的，所以只存改动、格子与冷却
 const saveState = {
-  inv, store, skills, terra, veins, nodes, view, settings, surv,
+  inv, store, skills, terra, veins, nodes, view, settings, surv, caught,
   get mat() { return selMat; },
   setMat: (v) => { selMat = v; },
 };
@@ -75,6 +76,9 @@ function flushSave(force) {
 let selMat = BRICK;
 let img = null;
 let hover = null;
+const fish = createFishing();
+let fishSpot = null;                  // 下竿时站在哪，走开两格就自动收竿
+const caught = new Set();             // 钓起过的鱼：鱼类图鉴靠它点亮
 let gather = null;      // 正在进行的采集
 let toastText = '', toastLeft = 0;
 let craftOpen = false;
@@ -102,7 +106,9 @@ canvas.addEventListener('mousedown', (e) => {
 });
 window.addEventListener('mouseup', (e) => {
   if (dragging && moved < 5 && e.target === canvas) {
-    act(e.button === 2 ? 'place' : 'dig');
+    // 左键 = 采集 / 下竿；右键 = 垒建材。掘土取消之后，右键不再破土
+    if (e.button === 2) act();
+    else pressAction();
   }
   dragging = false;
 });
@@ -122,7 +128,7 @@ canvas.addEventListener('wheel', (e) => {
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ------------------------------------------------------------------ 触控
-// 单指拖 = 漫游；双指张合 = 缩放；轻点 = 选中脚边那一格（真要动土按下方按钮）
+// 单指拖 = 漫游；双指张合 = 缩放；轻点 = 走到那一格（采与钓按下方按钮）
 const touchPts = new Map();
 let pinchD = 0, tapT = 0, tapMove = 0, tapX = 0, tapY = 0;
 
@@ -183,7 +189,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (menuApi) menuApi.toggle(); return; }
   if (menuApi && menuApi.isOpen()) return;   // 菜单开着时不响应游戏按键
   keys[e.code] = true;
-  if (e.code === 'KeyE') startGather();
+  if (e.code === 'KeyE') pressAction();
+  if (e.code === 'KeyG') startGather();
   if (e.code === 'KeyF') eatOrDrink();
   if (e.code === 'KeyC') toggleCraft();
   if (e.code === 'KeyB') toggleStore();
@@ -210,11 +217,12 @@ function pickCell(sx, sy) {
   return [wx, wy];
 }
 
-function act(kind) {
-  if (!view.near) { say('滚轮放大到近景才好动土'); return; }
+/** 右键垒一层建材。掘土取消之后，这里只剩「加」，不再有「破」 */
+function act() {
+  if (!view.near) { say('滚轮放大到近景才好垒材'); return; }
   if (!hover) return;
   const [wx, wy] = hover;
-  const r = kind === 'dig' ? terra.dig(wx, wy, inv) : terra.place(wx, wy, selMat, inv);
+  const r = terra.place(wx, wy, selMat, inv);
   if (r.ok) scroll.patch(wx, wy, terra);
   say(r.msg);
   renderBag();
@@ -264,6 +272,44 @@ function targetMeta(t) {
     skill: k.skill, tool: k.tool, tier: 0, exp: 8 + q * 4,
     name: itemName(loot.id), out: loot,
   };
+}
+
+/**
+ * 按 E：站在水边就下竿，否则采脚边的东西。
+ * 掘土取消之后，人与世界之间只剩「采」与「钓」两件事。
+ */
+function pressAction() {
+  // 正在钓：再按一次 E 就是收竿
+  if (fish.phase !== PHASE.IDLE) {
+    const r = fish.action();
+    if (r.ev === 'catch') landFish(r.fish);
+    else if (r.ev === 'cancel') { fishSpot = null; say('收竿'); }
+    return;
+  }
+  const c = view.center();
+  const w = waterNear((x, y) => terra.type(x, y), c[0], c[1]);
+  if (w) {
+    if (!view.near) { say('放大到近景才好下竿'); return; }
+    const rod = bestTool(inv, 'rod');
+    if (!rod) { say('要下竿，先得有根钓竿（百工谱里可合成）'); return; }
+    fishSpot = [c[0], c[1]];
+    say(fish.cast(rodPower(rod), skills.level('fishing'), w.deep));
+    return;
+  }
+  startGather();
+}
+
+/** 收竿得鱼：进背包、点亮鱼类图鉴、长钓技 */
+function landFish(id) {
+  fishSpot = null;
+  const q = qualityOf(id);
+  const got = inv.add(id, 1);
+  caught.add(id);
+  let msg = got ? `钓上 ${itemName(id)}×${got}` : `${itemName(id)} 带不下了`;
+  const up = skills.gain('fishing', 12 + q.tier * 6);
+  if (up) msg += `　${SKILL_CN.fishing}升至 ${skills.level('fishing')} 级`;
+  say(msg);
+  renderBag();
 }
 
 function startGather() {
@@ -316,7 +362,7 @@ function renderBag() {
   const items = inv.list();
   el.bag.innerHTML = '';
   if (!items.length) {
-    el.bag.innerHTML = '<div class="empty">空空如也，先挖两下</div>';
+    el.bag.innerHTML = '<div class="empty">空空如也，去地上采点东西吧</div>';
   }
   for (const it of items) {
     const d = document.createElement('div');
@@ -749,13 +795,25 @@ function drawGather(c) {
     ctx.fillStyle = '#f2e9dc';
     const m = targetMeta({ kind: gather.kind, p });
     ctx.fillText(`${ACT[m.skill]} ${m.name} ${Math.max(0, gather.dur - gather.t).toFixed(1)}s`, s[0], y - 4);
+  } else if (fish.phase !== PHASE.IDLE) {
+    // 钓鱼中：咬钩那一刻用红底提示，别让人错过窗口
+    const s = screenOf(c[0], c[1], 2);
+    const bite = fish.phase === PHASE.BITE;
+    const label = fish.hint();
+    const w = ctx.measureText(label).width + 12;
+    ctx.fillStyle = bite ? 'rgba(150,44,32,.9)' : 'rgba(12,16,22,.8)';
+    ctx.fillRect(s[0] - w / 2, s[1] - 34, w, 16);
+    ctx.fillStyle = bite ? '#ffe08a' : '#cfe6f2';
+    ctx.fillText(label, s[0], s[1] - 22);
   } else if (settings.showHint) {
     const t = targetAt(c[0], c[1], 2);
-    if (t) {
-      const m = targetMeta(t);
-      const s = screenOf(c[0], c[1], 2);
+    const s = screenOf(c[0], c[1], 2);
+    const w0 = waterNear((x, y) => terra.type(x, y), c[0], c[1]);
+    let label = '';
+    if (t) label = `[E] ${ACT[targetMeta(t).skill]} ${targetMeta(t).name}`;
+    else if (w0) label = '[E] 下竿垂钓';
+    if (label) {
       ctx.fillStyle = 'rgba(12,16,22,.8)';
-      const label = `[E] ${ACT[m.skill]} ${m.name}`;
       const w = ctx.measureText(label).width + 10;
       ctx.fillRect(s[0] - w / 2, s[1] - 26, w, 14);
       ctx.fillStyle = '#f2c14e';
@@ -794,6 +852,19 @@ function frame(now) {
   tickGather(dt);
   if (veins.tick(dt) > 0) say('矿脉复生');
   nodes.tick(dt);
+  // 钓鱼：推进状态机；走开两格以上就自动收竿
+  if (fish.phase !== PHASE.IDLE) {
+    const c = view.center();
+    if (fishSpot && Math.abs(c[0] - fishSpot[0]) + Math.abs(c[1] - fishSpot[1]) > 2) {
+      fish.idle();
+      fishSpot = null;
+      say('走开了，收了竿');
+    } else {
+      const ev = fish.tick(dt);
+      if (ev === 'bite') say('咬钩了！按 E 收竿');
+      else if (ev === 'lost') { fishSpot = null; say('鱼跑了'); }
+    }
+  }
 
   // 生存：饥渴跟着昼夜走，把昼夜调成静止，饥渴也就停了
   const dayFrac = dt * (settings.daySpeed || 0) / DAY_SEC;
@@ -965,6 +1036,7 @@ menuApi = createMenu({
     say('清档重开：一切回到最初');
   },
   saveInfo,
+  getCaught: () => caught,
 });
 document.getElementById('gear').onclick = () => menuApi.toggle();
 
@@ -974,9 +1046,9 @@ if (touchBar) {
   for (const b of touchBar.querySelectorAll('button')) {
     b.onclick = () => {
       const a = b.dataset.act;
-      if (a === 'dig') act('dig');
-      else if (a === 'place') act('place');
-      else if (a === 'gather') startGather();
+      if (a === 'place') act();
+      else if (a === 'gather') pressAction();   // 采地上的物资；站水边就是下竿
+      else if (a === 'gatherOnly') startGather();
       else if (a === 'eat') eatOrDrink();
       else if (a === 'craft') toggleCraft();
       else if (a === 'store') toggleStore();

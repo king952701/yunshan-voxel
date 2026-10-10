@@ -1,21 +1,19 @@
-// 2.5D 的动土与营建：改动层覆盖在原始地形之上，50 式合成与 3D 版共用同一份配方。
+// 2.5D 的行囊与营建：格子制容器，五十式合成与 3D 版共用同一份配方。
+// 掘土（破坏地块）已经取消 —— 地表再拿不走了，但建材还能垒；
+// 取物的路子只剩两条：采地上的物资、在水边钓鱼。
 import { T } from './palette.js';
 import {
-  DIRT, SAND, STONE, WOOD, BAMBOO, SNOW, PLANK, STICK,
-  BRICK, BEAM, WINDOW, MAT, BANNER, STONE_LAMP, EAVE, GLAZE_TILE, CRATE, STELE,
-  ROOF, GATE, ITEMS, itemName,
+  PLANK, STICK, BRICK, MAT,
+  BEAM, WINDOW, BANNER, STONE_LAMP, EAVE, GLAZE_TILE, CRATE, STELE, ROOF, GATE,
+  ITEMS, itemName,
 } from '../core/items.js';
 
 export const MAT_MAX = 9999;   // 旧的材料叠加上限，格子制之后只作参考
 export const BAG_SIZE = 500;   // 行囊五百格
 export const STORE_SIZE = 1000;   // 仓库一千格
-export const MIN_H = 4;        // 再挖就穿了
-export const MAX_H = 92;
+export const MAX_H = 92;       // 垒到这么高就够不着了
 
-// 九种地表各掉落什么（下标即 palette 的 T）
-export const DIG_DROP = [null, null, SAND, DIRT, WOOD, BAMBOO, STONE, SNOW, DIRT, DIRT];
-
-/** 12 种可自筑的中式建材 */
+/** 12 种可自筑的中式建材（掘土取消之后，垒材是唯一的动土方式） */
 export const BUILD_MATS = [
   BRICK, BEAM, WINDOW, MAT, BANNER, STONE_LAMP,
   EAVE, GLAZE_TILE, CRATE, STELE, ROOF, GATE,
@@ -154,8 +152,9 @@ export function bestPick(inv) {
 }
 
 /**
- * 地形改动层：玩家挖过的坑、堆起的台基都记在这里，
- * 原始地形函数保持纯净，因此长卷与近景读到的始终是同一份世界。
+ * 地形改动层：垒起来的台基、牌坊记在这里，覆盖在原始地形之上。
+ * 掘土取消之后这一层只会加高、不会挖低；原始地形函数保持纯净，
+ * 因此长卷与近景读到的始终是同一份世界。
  */
 export class Terra {
   constructor(map) {
@@ -170,29 +169,7 @@ export class Terra {
   type(wx, wy) { const d = this.cell(wx, wy); return d ? d.t : this.map.type(wx, wy); }
   mat(wx, wy) { const d = this.cell(wx, wy); return d ? d.mat || 0 : 0; }
 
-  /** 挖下一层，掉落进背包；拆建材则原样返还 */
-  dig(wx, wy, inv) {
-    if (!this.map.inWorld(wx, wy)) return { ok: false, msg: '图幅之外' };
-    const h = this.height(wx, wy);
-    const t = this.type(wx, wy);
-    if (t === T.DEEP || t === T.WATER) return { ok: false, msg: '水里挖不动' };
-    if (h <= MIN_H) return { ok: false, msg: '再挖就穿了' };
-
-    const d = this.cell(wx, wy);
-    if (d && d.mat) {
-      const back = inv.add(d.mat, 1);
-      this.deltas.set(Terra.key(wx, wy), { h: h - 1, t: T.DUG, mat: 0 });
-      return { ok: true, drop: d.mat, msg: back ? `拆下 ${itemName(d.mat)}` : `${itemName(d.mat)} 带不下了` };
-    }
-
-    const drop = DIG_DROP[t];
-    this.deltas.set(Terra.key(wx, wy), { h: h - 1, t: T.DUG, mat: 0 });
-    if (drop == null) return { ok: true, drop: 0, msg: '掘开一层' };
-    const got = inv.add(drop, 1);
-    return { ok: true, drop, msg: got ? `得 ${itemName(drop)}` : `${itemName(drop)} 带不下了` };
-  }
-
-  /** 在地表垒一层建材，可堆土丘、筑台基 */
+  /** 在地表垒一层建材，可堆土丘、筑台基（这套地形只加不减） */
   place(wx, wy, matId, inv) {
     if (!this.map.inWorld(wx, wy)) return { ok: false, msg: '图幅之外' };
     if (!matId) return { ok: false, msg: '先选一种建材' };

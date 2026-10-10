@@ -13,8 +13,9 @@ export function createMenu(opts) {
   const {
     skills, settings, onSetting, onResetTerrain,
     onSave = () => {}, onLoad = () => {}, onClear = () => {}, saveInfo = () => null,
+    getCaught = () => null,
   } = opts;
-  const codex = buildCodex(skills);
+  let codex = buildCodex(skills);
   let open = false, tab = 'help', cat = 'all', query = '', picked = codex[0];
 
   const wrap = document.createElement('div');
@@ -210,6 +211,10 @@ export function createMenu(opts) {
   const api = {
     open() {
       show(true);
+      // 鱼类图鉴靠「钓起过哪些鱼」点亮，所以每次打开都按最新的渔获重编一遍
+      const keep = picked && picked.title;
+      codex = buildCodex(skills, getCaught());
+      picked = codex.find((e) => e.title === keep) || codex[0];
       renderAll();
       renderSettings();
       if (tab === 'help') el.search.focus();

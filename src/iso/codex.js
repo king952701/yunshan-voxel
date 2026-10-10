@@ -1,7 +1,7 @@
 // 游戏内置数据库：把物品、矿脉、配方、技能、品级、操作汇编成可索引、可检索的条目。
 // 帮助面板与搜索框都读这一份，数据与游戏本体同源，不会说一套做一套。
 import {
-  ITEMS, BLOCKS, QUALITY, qualityOf, itemName, itemColor, itemIcon,
+  ITEMS, BLOCKS, QUALITY, qualityOf, itemName, itemColor, itemIcon, FISH_IDS,
 } from '../core/items.js';
 import { ORES, VEIN_CD, BASE_TIME, MINE_ORE, oreInfo } from './veins.js';
 import { KINDS, NODE_CD, NB } from './nodes.js';
@@ -12,10 +12,13 @@ import { WORLD } from './world2d.js';
 import { SEA, SNOW_LINE } from './palette.js';
 import { BIOME_NAME, GRID, MINE_KEYS, MINE_NAME } from '../core/biome.js';
 
-/** 索引分类 */
+/** 索引分类：物品拆成鱼、道具、装备、武器四本图鉴 */
 export const CATS = [
   { key: 'all', label: '全部' },
-  { key: 'item', label: '物品道具' },
+  { key: 'fish', label: '鱼类图鉴' },
+  { key: 'prop', label: '道具图鉴' },
+  { key: 'gear', label: '装备图鉴' },
+  { key: 'weapon', label: '武器图鉴' },
   { key: 'ore', label: '矿脉' },
   { key: 'node', label: '采集点' },
   { key: 'block', label: '方块' },
@@ -27,12 +30,26 @@ export const CATS = [
   { key: 'world', label: '山川' },
 ];
 
-const TOOL_CN = { pickaxe: '镐', axe: '斧', shovel: '铲', sickle: '镰', sword: '剑' };
+const TOOL_CN = { pickaxe: '镐', axe: '斧', shovel: '铲', sickle: '镰', sword: '剑', rod: '竿' };
+const FISH_SET = new Set(FISH_IDS);
+
+/**
+ * 一件东西归哪本图鉴：鱼看号段，兵器看 kind，甲胄看护体，其余的算道具。
+ * 工具（镐斧铲镰竿）也归道具 —— 它们不是兵器，也不是甲。
+ */
+export function itemCat(id, it) {
+  if (FISH_SET.has(id)) return 'fish';
+  if (it.tool && it.tool.kind === 'sword') return 'weapon';
+  if (it.armor) return 'gear';
+  return 'prop';
+}
+
+const CAT_LABEL = { fish: '鱼类', prop: '道具', gear: '装备', weapon: '武器' };
 const PICK_CN = ['', '木镐', '石镐', '铁镐'];
 const CAT_CN = new Map([...CATEGORIES, ...CRAFT_CATS].map((c) => [c.key, c.label]));
 
-/** 汇编全部条目。skills 用来显示当前技能等级，可省略。 */
-export function buildCodex(skills) {
+/** 汇编全部条目。skills 显示当前技能等级，caught 是钓起过的鱼（点亮鱼类图鉴） */
+export function buildCodex(skills, caught) {
   const out = [];
 
   for (const q of QUALITY) {
@@ -83,12 +100,34 @@ export function buildCodex(skills) {
     });
   }
 
+  // 鱼类图鉴：一百五十种鱼。没钓起来过的只留个问号，钓起来才写得出习性
+  for (const id of FISH_IDS) {
+    const it = ITEMS[id];
+    if (!it) continue;
+    const q = qualityOf(id);
+    const got = caught ? caught.has(id) : false;
+    out.push({
+      cat: 'fish',
+      title: got ? it.name : '？？？',
+      color: got ? it.color : '#586471',
+      icon: got ? it.icon : '❔',
+      sub: `${q.name}（第 ${q.tier} 阶）· ${got ? '已钓起' : '未曾钓起'}`,
+      body: got
+        ? `进食回复 ${it.food} 饱食。`
+          + (q.tier >= 6 ? '深水里的大鱼，得有好竿与好钓技才请得动。' : '浅水常见，新手也钓得上。')
+        : '还没钓起来过。站在水边按 E 下竿，咬钩时再按一次 E 收竿。',
+      tags: `鱼 鱼类图鉴 钓鱼 ${got ? it.name : '未钓起'} ${q.name}`,
+    });
+  }
+
   for (const [key, it] of Object.entries(ITEMS)) {
     const id = Number(key);
+    if (FISH_SET.has(id)) continue;          // 鱼另有图鉴，不在这里重复
     const q = qualityOf(id);
     const bits = [];
     if (it.food) bits.push(`进食回复 ${it.food} 饱食`);
     if (it.heal) bits.push(`疗伤 ${it.heal}`);
+    if (it.water) bits.push(`解渴 ${it.water}`);
     if (it.armor) bits.push(`护体 ${it.armor}`);
     if (it.tool) {
       bits.push(`${TOOL_CN[it.tool.kind] || it.tool.kind} · 品级 ${it.tool.tier} · 速度 ${it.tool.speed}`
@@ -96,11 +135,12 @@ export function buildCodex(skills) {
     }
     if (it.stack > 1) bits.push(`每格可叠 ${it.stack}`);
     else bits.push('每格仅一件');
+    const cat = itemCat(id, it);
     out.push({
-      cat: 'item', title: it.name, color: it.color, icon: it.icon,
-      sub: `${q.name}（第 ${q.tier} 阶）`,
+      cat, title: it.name, color: it.color, icon: it.icon,
+      sub: `${CAT_LABEL[cat]} · ${q.name}（第 ${q.tier} 阶）`,
       body: bits.join('　'),
-      tags: `${it.name} ${q.name} 物品 ${it.tool ? TOOL_CN[it.tool.kind] : ''}`,
+      tags: `${it.name} ${CAT_LABEL[cat]} ${q.name} 物品 ${it.tool ? TOOL_CN[it.tool.kind] : ''}`,
     });
   }
 
@@ -145,11 +185,14 @@ export function buildCodex(skills) {
 
   const controls = [
     ['拖拽', '按住左键拖动', '在山水长卷上漫游'],
-    ['滚轮', '向上放大 / 向下缩小', '长卷与近景之间切换；近景才能动土与采矿'],
-    ['左键', '掘土开采', '挖掉一格，按地表掉落材料；水域挖不动'],
-    ['右键', '垒建材', '在当前建材上垒一层，高度 +1'],
+    ['滚轮', '向上放大 / 向下缩小', '长卷与近景之间切换；近景才能采集、下竿与垒材'],
+    ['左键', '采集 / 下竿', '脚边有东西就采，站在水边则下竿'],
+    ['右键', '垒建材', '在当前建材上垒一层，高度 +1。地表只加不减，掘土已经取消'],
     ['1 ~ 9', '切换建材', '青砖、木梁、纸窗、竹席等十二种中式建材'],
-    ['E', '采矿脉', '靠近露头按 E，5 秒进度条；须持矿镐，走开即中断'],
+    ['E', '采集', '脚边有矿脉、树木、灌木、药丛、野兽、土堆、果丛就采，5 秒进度条；须持对应家伙，走开即中断'],
+    ['E（水边）', '下竿垂钓', '靠近任何水域按 E 自动进钓鱼模式，咬钩时再按一次 E 收竿。竿越好、钓技越高，鱼来得越快、窗口越宽；深水才钓得上大鱼'],
+    ['G', '只采不钓', '水边同时有东西可采时，用它跳过下竿'],
+    ['F', '进食', '先救命、再解渴、再充饥；走到水边按 F 可捧水喝'],
     ['C', '百工谱', '开合成面板，五类共五十式，缺料者变灰'],
     ['R', '回到图心', '视野跳回原点'],
     ['WASD / 方向键', '漫游', '按等距方向移动视野'],
