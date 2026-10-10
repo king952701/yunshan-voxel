@@ -95,6 +95,11 @@
     padding: 18px 20px; display: none; pointer-events: auto;
   }
   .panel.show { display: block; }
+  /* 面板自己滚动会把右上角的 ✕ 带走，改成只让里面的清单滚 */
+  .panel.has-x { overflow: hidden; }
+  .panel.has-x.show { display: flex; flex-direction: column; }
+  .panel.has-x > h2 { flex: 0 0 auto; }
+  .panel.has-x > div { overflow: auto; min-height: 0; }
   .panel h2 { margin: 0 0 12px; font-size: 16px; color: var(--gold); letter-spacing: 2px; }
   #inv-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; }
   .slot.wide { height: 62px; }

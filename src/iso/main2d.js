@@ -15,6 +15,7 @@ import {
 } from '../game/crafting.js';
 import { itemName, itemColor, qualityOf, ITEMS, BRICK } from '../core/items.js';
 import { createMenu } from './menu.js';
+import { addClose } from '../ui/closer.js';
 import { write, read, clearSave, saveInfo } from './save.js';
 import { Survival, MAX_STAT } from './survival.js';
 
@@ -37,9 +38,12 @@ const el = {
   store: document.getElementById('store'), storeBody: document.getElementById('store-body'),
   storeCap: document.getElementById('store-cap'),
   vitals: document.getElementById('vitals'),
+  bagwrap: document.getElementById('bagwrap'), tip: document.getElementById('tip'),
 };
 
-const settings = { daySpeed: 1, showHint: true, showPlayer: true, showHud: true };
+const settings = {
+  daySpeed: 1, showHint: true, showPlayer: true, showHud: true, showBag: true, showTip: true,
+};
 let menuApi = null;   // 设置菜单，末尾创建
 
 const map = new Map2D(SEED);
@@ -831,6 +835,9 @@ function frame(now) {
   canvas.style.filter = skyFilter(sky.dayF, sky.dawn);
 
   el.hud.style.display = settings.showHud ? 'block' : 'none';
+  // 行囊与操作提示留空字符串，手机上「隐藏提示」那类媒体查询才压得动
+  el.bagwrap.style.display = settings.showBag ? '' : 'none';
+  el.tip.style.display = settings.showTip ? '' : 'none';
   el.coord.textContent = `${c[0]}, ${c[1]}`;
   el.zoom.textContent = view.near
     ? `近景 · 每格 ${view.tw.toFixed(1)}px（滚轮缩小看长卷）`
@@ -885,6 +892,18 @@ if (read(saveState)) {
   startingKit(inv);
   say('新开一卷山水：拖动漫游，滚轮缩小可退看整幅长卷');
 }
+
+// 老档里没有行囊与提示这两个开关，补上默认值，免得一读档面板就没了
+if (typeof settings.showBag !== 'boolean') settings.showBag = true;
+if (typeof settings.showTip !== 'boolean') settings.showTip = true;
+
+// 每个界面容器右上角都装一个 ✕：点一下收起来，不留关不掉的东西。
+// 收起来的面板都能在设置里开回来（界面读数 / 行囊 / 操作提示）。
+addClose(el.craft, () => toggleCraft());
+addClose(el.store, () => toggleStore());
+addClose(el.hud, () => { settings.showHud = false; markSave(); });
+addClose(el.bagwrap, () => { settings.showBag = false; markSave(); });
+addClose(el.tip, () => { settings.showTip = false; markSave(); });
 
 // 开场就落到看得清细节的一档。老存档常停在「整图铺满」那一档，
 // 每格不到一个像素，人跟草木都看不见，会让人以为资源没加载。

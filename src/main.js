@@ -11,6 +11,7 @@ import { RECIPES, craft, STICK } from './game/crafting.js';
 import { Survival } from './game/survival.js';
 import { Enemies } from './game/enemies.js';
 import { Hud, bindInventory } from './ui/hud.js';
+import { addClose } from './ui/closer.js';
 
 const params = new URLSearchParams(location.search);
 const SEED = Number(params.get('seed') || 20261010) | 0;
@@ -230,6 +231,14 @@ function respawn() {
   enemies.clear();
   if (started) lock();
 }
+
+// 每个界面容器右上角都装一个 ✕：点一下收起来，不留关不掉的东西。
+// 开局遮罩上点 ✕ 就是开始，力竭遮罩上点 ✕ 就是重生，跟点画面 / 按 R 一样。
+addClose(hud.el.panelInv, () => setPanel(null));
+addClose(hud.el.panelCraft, () => setPanel(null));
+addClose(hud.el.help, () => hud.toggleHelp());
+addClose(hud.el.start, () => startGame(), { pad: false });
+addClose(hud.el.dead, () => respawn(), { pad: false });
 
 // ------------------------------------------------------------------ 交互
 function toolSpeedFor(block) {

@@ -8,7 +8,7 @@ const ASSETS = [
   './src/main.js', './src/core/items.js', './src/core/noise.js', './src/core/terrain.js',
   './src/game/crafting.js', './src/game/craftgen.js', './src/game/inventory.js',
   './src/game/player.js', './src/game/enemies.js', './src/game/survival.js',
-  './src/ui/hud.js',
+  './src/ui/hud.js', './src/ui/closer.js',
   './src/world/blocks.js', './src/world/chunk.js', './src/world/generator.js',
   './src/world/structures.js', './src/world/world.js',
   './src/iso/main2d.js', './src/iso/world2d.js', './src/iso/view2d.js',

@@ -42,6 +42,8 @@ export function createMenu(opts) {
           <div class="row"><span>矿脉提示气泡</span><span class="btns hint"></span></div>
           <div class="row"><span>旅人标记</span><span class="btns player"></span></div>
           <div class="row"><span>界面读数</span><span class="btns hud"></span></div>
+          <div class="row"><span>行囊</span><span class="btns bagui"></span></div>
+          <div class="row"><span>操作提示</span><span class="btns tipui"></span></div>
           <div class="row"><span>复原全部动土</span><span class="btns reset"></span></div>
           <p class="note">复原会把你挖过、垒过的地方全部还原成原始山水，长卷也会重画一遍。</p>
           <div class="row"><span>存档</span><span class="btns save"></span></div>
@@ -158,6 +160,9 @@ export function createMenu(opts) {
     toggle(hintBox, 'showHint');
     toggle(playerBox, 'showPlayer');
     toggle(hudBox, 'showHud');
+    // 用 ✕ 收起来的面板，在这里开回来
+    toggle(setPane.querySelector('.bagui'), 'showBag');
+    toggle(setPane.querySelector('.tipui'), 'showTip');
     resetBox.innerHTML = '';
     resetBox.appendChild(btn('复原地形', false, () => {
       onResetTerrain();
