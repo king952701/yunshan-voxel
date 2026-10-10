@@ -13,6 +13,7 @@ const ASSETS = [
   './src/world/blocks.js', './src/world/chunk.js', './src/world/generator.js',
   './src/world/structures.js', './src/world/world.js',
   './src/iso/main2d.js', './src/iso/world2d.js', './src/iso/view2d.js',
+  './src/iso/traveler.js',
   './src/iso/render2d.js', './src/iso/palette.js', './src/iso/edit2d.js',
   './src/iso/veins.js', './src/iso/nodes.js', './src/iso/skill.js',
   './src/iso/codex.js', './src/iso/menu.js', './src/iso/save.js', './src/iso/survival.js',

@@ -2,6 +2,7 @@
 // 8000x8000 的中式山水，45° 等距投影，最小像素格；可拖拽漫游、缩放、动土营建、持镐采矿。
 import { Map2D, Scroll, WORLD } from './world2d.js';
 import { View2D, ZOOM_MULTS } from './view2d.js';
+import { charHeight, drawTraveler } from './traveler.js';
 import { renderFar, renderNear } from './render2d.js';
 import { skyFilter, T } from './palette.js';
 import {
@@ -641,11 +642,28 @@ function drawVeins(c) {
   }
 }
 
+// 走路：视图中心一动就推进相位，停下就把摆动收回立定姿势
+let walkPhase = 0, walkAmp = 0, charFace = 1, lastCenter = null;
+
+function updateWalk(c, dt) {
+  const dx = lastCenter ? c[0] - lastCenter[0] : 0;
+  const dy = lastCenter ? c[1] - lastCenter[1] : 0;
+  const step = Math.hypot(dx, dy);
+  walkAmp += ((step > 0.02 ? 1 : 0) - walkAmp) * Math.min(1, dt * 8);
+  if (step > 0.02) {
+    walkPhase += Math.min(step, 3) * 1.9;          // 走得快，迈步也快
+    const sx = dx - dy;                            // 等距视图里屏幕上的横向位移
+    if (Math.abs(sx) > 0.02) charFace = sx > 0 ? 1 : -1;
+  }
+  lastCenter = c;
+}
+
 /** 旅人：就在视野中心那一格。缩到长卷上也要一眼找得着自己 */
 function drawPlayer(c) {
-  const s = screenOf(c[0], c[1], 1);
   if (!view.near) {
-    // 整幅长卷时人只剩一两个像素，所以画一圈金环加四面刻线
+    // 整幅长卷时人只剩一两个像素，所以画一圈金环加四面刻线当定位标记。
+    // 这一档不乘放大倍数 —— 那是「人的身量」，环是「地图上的记号」。
+    const s = screenOf(c[0], c[1], 1);
     const r = 8;
     ctx.strokeStyle = '#ffd88a';
     ctx.lineWidth = 2;
@@ -664,13 +682,10 @@ function drawPlayer(c) {
     ctx.fill();
     return;
   }
-  ctx.fillStyle = '#2b2f38';
-  ctx.fillRect(s[0] - 1, s[1] - 7, 3, 6);
-  ctx.beginPath();
-  ctx.ellipse(s[0], s[1] - 7, 4.5, 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#e8c07a';
-  ctx.fillRect(s[0] - 3, s[1] - 8, 7, 1);
+  // 脚底落在地面那一格上（lift = 0），身高按格子算再乘放大倍数
+  const s = screenOf(c[0], c[1], 0);
+  const H = charHeight(view.th, view.hz);
+  drawTraveler(ctx, s[0], s[1], H, walkPhase, charFace, walkAmp);
 }
 
 /** 地表采集点：树画树冠、钓点画涟漪、兽画身形，一眼能分 */
@@ -810,6 +825,7 @@ function frame(now) {
   ctx.putImageData(img, 0, 0);
 
   const c = view.center();
+  updateWalk(c, dt);
   if (view.near && hover) {
     // 指向的格子描一圈金边，点下去才知道落在哪
     const p = view.projOf(hover[0], hover[1], terra.height(hover[0], hover[1]));
