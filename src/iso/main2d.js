@@ -10,8 +10,10 @@ import {
 import { Veins, oreInfo, FX_TIME, BASE_TIME } from './veins.js';
 import { Nodes, KINDS, kindInfo, NODE_CD } from './nodes.js';
 import { Skills, SKILLS, gatherTime } from './skill.js';
-import { RECIPES, CATEGORIES, canCraft, craft } from '../game/crafting.js';
-import { itemName, itemColor, qualityOf, BRICK } from '../core/items.js';
+import {
+  ALL_RECIPES, CATEGORIES, CRAFT_CATS, SKILL_OF_CAT, canCraft, craft,
+} from '../game/crafting.js';
+import { itemName, itemColor, qualityOf, ITEMS, BRICK } from '../core/items.js';
 import { createMenu } from './menu.js';
 
 const params = new URLSearchParams(location.search);
@@ -247,32 +249,79 @@ function renderBag() {
   el.mat.style.color = itemColor(selMat);
 }
 
+const CRAFT_PAGE = 40;
+let craftPage = 0;
+let craftQ = '';
+
+// 搜索框只建一次，免得每次重绘都丢焦点
+const craftSearch = document.createElement('input');
+craftSearch.className = 'craft-search';
+craftSearch.placeholder = '搜配方（如 玄铁剑、丹、符）';
+craftSearch.oninput = () => { craftQ = craftSearch.value; craftPage = 0; renderCraft(); };
+el.tabs.after(craftSearch);
+
 function renderCraft() {
   el.tabs.innerHTML = '';
-  for (const c of CATEGORIES) {
+  for (const c of CRAFT_CATS) {
     const b = document.createElement('button');
     b.textContent = c.label;
     b.className = c.key === craftCat ? 'on' : '';
-    b.onclick = () => { craftCat = c.key; renderCraft(); };
+    b.onclick = () => { craftCat = c.key; craftPage = 0; renderCraft(); };
     el.tabs.appendChild(b);
   }
+  const baseCats = new Set(CATEGORIES.map((c) => c.key));
+  let list = ALL_RECIPES.filter((r) => (craftCat === 'base' ? baseCats.has(r.cat) : r.cat === craftCat));
+  if (craftQ.trim()) {
+    const q = craftQ.trim();
+    list = list.filter((r) => itemName(r.out.id).includes(q));
+  }
+  const pages = Math.max(1, Math.ceil(list.length / CRAFT_PAGE));
+  craftPage = Math.max(0, Math.min(pages - 1, craftPage));
   el.craftBody.innerHTML = '';
-  const list = RECIPES.filter((r) => r.cat === craftCat);
-  for (const r of list) {
+  for (const r of list.slice(craftPage * CRAFT_PAGE, craftPage * CRAFT_PAGE + CRAFT_PAGE)) {
     const okc = canCraft(inv, r);
+    const qq = qualityOf(r.out.id);
     const row = document.createElement('div');
     row.className = 'row' + (okc ? '' : ' off');
     const need = Object.entries(r.in)
       .map(([id, n]) => `${itemName(Number(id))}×${n}`).join('　');
     row.innerHTML = `<div class="out"><i style="background:${itemColor(r.out.id)}"></i>`
-      + `${itemName(r.out.id)}×${r.out.count}</div>`
+      + `${itemName(r.out.id)}`
+      + `<em style="color:${qq.color};font-style:normal;font-size:10px"> ${qq.name}</em>`
+      + `×${r.out.count}</div>`
       + `<div class="in">${need}</div>`
-      + `<div class="tip">${r.tip}</div>`;
+      + (r.tip ? `<div class="tip">${r.tip}</div>` : '');
     row.onclick = () => {
-      if (craft(inv, r)) { say(`合成${itemName(r.out.id)}×${r.out.count}`); renderBag(); renderCraft(); }
-      else say('材料不够');
+      if (!craft(inv, r)) { say('材料不够'); return; }
+      let msg = `合成${itemName(r.out.id)}×${r.out.count}`;
+      const k = SKILL_OF_CAT[r.cat];
+      if (k) {
+        const up = skills.gain(k, 10 + (ITEMS[r.out.id].q || 1) * 4);
+        if (up) msg += `　${SKILL_CN[k]}升至 ${skills.level(k)} 级`;
+      }
+      say(msg);
+      renderBag();
+      renderCraft();
     };
     el.craftBody.appendChild(row);
+  }
+  if (pages > 1) {
+    const bar = document.createElement('div');
+    bar.className = 'btns';
+    bar.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 0 2px';
+    const mk = (label, on) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.onclick = on;
+      return b;
+    };
+    bar.appendChild(mk('上一页', () => { craftPage = Math.max(0, craftPage - 1); renderCraft(); }));
+    const info = document.createElement('span');
+    info.className = 'note';
+    info.textContent = `第 ${craftPage + 1} / ${pages} 页　共 ${list.length} 式`;
+    bar.appendChild(info);
+    bar.appendChild(mk('下一页', () => { craftPage = Math.min(pages - 1, craftPage + 1); renderCraft(); }));
+    el.craftBody.appendChild(bar);
   }
 }
 

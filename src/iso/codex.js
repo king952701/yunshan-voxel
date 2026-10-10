@@ -6,7 +6,7 @@ import {
 import { ORES, VEIN_CD, BASE_TIME } from './veins.js';
 import { KINDS, NODE_CD, NB } from './nodes.js';
 import { SKILLS, SKILL_BY_KEY } from './skill.js';
-import { RECIPES, CATEGORIES } from '../game/crafting.js';
+import { ALL_RECIPES, CATEGORIES, CRAFT_CATS } from '../game/crafting.js';
 import { BUILD_MATS } from './edit2d.js';
 import { WORLD } from './world2d.js';
 import { SEA, SNOW_LINE } from './palette.js';
@@ -27,7 +27,7 @@ export const CATS = [
 
 const TOOL_CN = { pickaxe: '镐', axe: '斧', shovel: '铲', sickle: '镰', sword: '剑' };
 const PICK_CN = ['', '木镐', '石镐', '铁镐'];
-const CAT_CN = new Map(CATEGORIES.map((c) => [c.key, c.label]));
+const CAT_CN = new Map([...CATEGORIES, ...CRAFT_CATS].map((c) => [c.key, c.label]));
 
 /** 汇编全部条目。skills 用来显示当前技能等级，可省略。 */
 export function buildCodex(skills) {
@@ -102,14 +102,15 @@ export function buildCodex(skills) {
     });
   }
 
-  for (const r of RECIPES) {
+  for (const r of ALL_RECIPES) {
     const need = Object.entries(r.in)
       .map(([id, n]) => `${itemName(Number(id))}×${n}`).join('　');
+    const cn = CAT_CN.get(r.cat) || r.cat;
     out.push({
       cat: 'recipe', title: `${itemName(r.out.id)}×${r.out.count}`, color: itemColor(r.out.id),
-      sub: CAT_CN.get(r.cat) || r.cat,
+      sub: cn,
       body: `${need}${r.tip ? `　—— ${r.tip}` : ''}`,
-      tags: `${itemName(r.out.id)} 配方 合成 ${CAT_CN.get(r.cat) || ''}`,
+      tags: `${itemName(r.out.id)} 配方 合成 ${cn}`,
     });
   }
 

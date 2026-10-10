@@ -9,6 +9,7 @@ import {
   IRON_SICKLE, IRON_AXE, RATTAN_ARMOR, IRON_ARMOR, GLAZE, MORTAR, PANACEA, RATION,
   HEAVY_ARMOR,
 } from '../core/items.js';
+import { GEN_RECIPES } from './craftgen.js';
 
 // 物品 id 常量也搬到了 core/items.js，这里原样转出，老调用方不用改。
 export {
@@ -25,6 +26,23 @@ export const CATEGORIES = [
   { key: 'food', label: '饮食医药' },
   { key: 'armor', label: '护身' },
 ];
+
+// 制作十门：每门八十式，由 craftgen 按「器型 × 材料」生成
+export const CRAFT_CATS = [
+  { key: 'base', label: '常用' },
+  { key: 'weapon', label: '兵器' }, { key: 'armor', label: '防具' },
+  { key: 'tool', label: '工具' }, { key: 'build', label: '建材' },
+  { key: 'ornament', label: '饰品' }, { key: 'pill', label: '丹药' },
+  { key: 'food', label: '食物' }, { key: 'liquor', label: '酒水' },
+  { key: 'pigment', label: '颜料' }, { key: 'talisman', label: '符箓' },
+];
+
+/** 每类配方归属哪门制作技能（常用的五十式并入相近的门） */
+export const SKILL_OF_CAT = {
+  mat: 'build', tool: 'tool', build: 'build', food: 'food', armor: 'armor',
+  weapon: 'weapon', ornament: 'ornament', pill: 'pill',
+  liquor: 'liquor', pigment: 'pigment', talisman: 'talisman',
+};
 
 export const RECIPES = [
   // ---------- 材料加工（15） ----------
@@ -87,6 +105,9 @@ export const RECIPES = [
   { cat: 'armor', out: { id: IRON_ARMOR, count: 1 }, in: { [IRON]: 4, [CLOTH]: 2 }, tip: '铁甲·减伤 6' },
   { cat: 'armor', out: { id: HEAVY_ARMOR, count: 1 }, in: { [IRON_ARMOR]: 1, [IRON]: 4, [ROPE]: 2 }, tip: '重铠·减伤 9' },
 ];
+
+// 手写的五十式 + 生成的八百式
+export const ALL_RECIPES = [...RECIPES, ...GEN_RECIPES];
 
 export function canCraft(inv, r) {
   for (const k in r.in) {
