@@ -149,6 +149,9 @@
     position: absolute; inset: 0; background: rgba(6,9,14,.72); z-index: 20;
     display: flex; align-items: center; justify-content: center;
   }
+  /* hidden 属性会被上面的 display:flex 盖掉（UA 的 [hidden]{display:none} 优先级最低），
+     所以这里必须显式补一条，否则菜单永远关不掉 */
+  .menu-wrap[hidden] { display: none; }
   .menu {
     width: min(900px, 94vw); height: min(620px, 88vh); background: var(--panel);
     border: 2px solid var(--line); display: flex; flex-direction: column; font-size: 12px;
@@ -158,9 +161,11 @@
     padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--gold);
   }
   .menu-head .mx {
-    font: inherit; cursor: pointer; color: #f2e9dc; background: transparent;
-    border: 1px solid var(--line); padding: 1px 7px;
+    font: inherit; font-size: 16px; line-height: 1; cursor: pointer;
+    color: #f2e9dc; background: transparent; border: 1px solid var(--line);
+    min-width: 38px; min-height: 34px; padding: 4px 10px;
   }
+  .menu-head .mx:hover { background: rgba(232,192,122,.18); color: var(--gold); }
   .menu-tabs { display: flex; gap: 6px; padding: 8px 12px 0; }
   .menu-tabs button, .cats button, .btns button {
     font: inherit; font-size: 11px; padding: 3px 10px; cursor: pointer;
@@ -172,6 +177,8 @@
   .menu-body { flex: 1; overflow: hidden; padding: 10px 12px 12px; }
   .pane { height: 100%; overflow: hidden; }
   .pane[data-pane="help"] { display: flex; gap: 10px; }
+  /* 同上：这条要压过 .pane[data-pane="help"] 的 display:flex，标签页才切得动 */
+  .pane[hidden] { display: none !important; }
   .help-left { width: 46%; display: flex; flex-direction: column; gap: 6px; }
   .help-right {
     flex: 1; border-left: 1px solid rgba(255,255,255,.1);
@@ -242,6 +249,7 @@
 <div id="toast"></div>
 
 <div id="tip">
+  <b>开场即是近景</b>：看得见自己（金顶那个小人）与脚边的草木矿脉；<b>滚轮缩小</b>可退看整幅长卷<br>
   <b>拖动</b> 漫游 · <b>滚轮</b> 缩放 · <b>WASD</b> 平移 · <b>R</b> 回中心 · <b>C</b> 开百工谱 · <b>B</b> 开仓库<br>
   <b>左键</b> 掘土开采 · <b>右键</b> 垒建材 · <b>1~9</b> 换建材（须先放大到近景）<br>
   <b>E</b> 采集：靠近矿脉 / 树木 / 药丛 / 钓点 / 野兽 / 土堆 / 果丛按 E，5 秒进度条，

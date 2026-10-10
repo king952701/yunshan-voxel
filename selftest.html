@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>WAIT</title></head>
+<body style="margin:0;background:#111;color:#eee;font:12px monospace">
+<iframe id="f" src="./iso.html" style="width:1200px;height:700px;border:1px solid #333"></iframe>
+<pre id="out">running…</pre>
+<script>
+const log = [];
+const say = (ok, name, extra = '') => log.push((ok ? 'PASS  ' : 'FAIL  ') + name + (extra ? '  — ' + extra : ''));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const f = document.getElementById('f');
+
+function finish() {
+  document.getElementById('out').textContent = log.join('\n');
+  document.title = log.some((l) => l.startsWith('FAIL')) ? 'RESULT-FAIL' : 'RESULT-ALLPASS';
+}
+
+f.onload = async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  const disp = (el) => (el ? w.getComputedStyle(el).display : 'no-element');
+  try {
+    await sleep(2500);                       // 等主循环与长卷起来
+    const wrap = d.querySelector('.menu-wrap');
+    const pane = (t) => d.querySelector('.pane[data-pane="' + t + '"]');
+    const mx = d.querySelector('.menu-head .mx');
+    const tab = (t) => [...d.querySelectorAll('.menu-tabs button')].find((b) => b.dataset.tab === t);
+
+    if (!wrap || !mx) { say(false, '设置菜单与关闭键都在 DOM 里'); finish(); return; }
+    say(true, '设置菜单与关闭键都在 DOM 里');
+
+    // 1. 开场
+    say(disp(wrap) === 'none', '开场菜单是关着的（hidden 压得住 display:flex）', 'display=' + disp(wrap));
+
+    // 2. 打开
+    d.getElementById('gear').click();
+    await sleep(150);
+    say(disp(wrap) !== 'none', '点右下角齿轮能打开', 'display=' + disp(wrap));
+
+    // 3. 标签切换（用户截图里「关于」高亮着、内容却还是帮助页）
+    tab('about').click();
+    await sleep(150);
+    say(disp(pane('about')) !== 'none', '切到「关于」看得到', 'display=' + disp(pane('about')));
+    say(disp(pane('help')) === 'none', '切到「关于」后帮助页确实收起', 'display=' + disp(pane('help')));
+    tab('set').click();
+    await sleep(150);
+    say(disp(pane('set')) !== 'none', '切到「设置」看得到', 'display=' + disp(pane('set')));
+    say(disp(pane('help')) === 'none' && disp(pane('about')) === 'none', '另外两页都收起了');
+    tab('help').click();
+    await sleep(150);
+
+    // 4. 关闭：这是用户报的问题
+    mx.click();
+    await sleep(200);
+    say(disp(wrap) === 'none', '点 ✕ 能关掉菜单', 'display=' + disp(wrap));
+
+    // 5. 反复开关
+    d.getElementById('gear').click();
+    await sleep(150);
+    const opened = disp(wrap) !== 'none';
+    mx.click();
+    await sleep(200);
+    say(opened && disp(wrap) === 'none', '开关可以反复，不会卡住');
+
+    // 6. Esc
+    d.getElementById('gear').click();
+    await sleep(150);
+    const before = disp(wrap) !== 'none';
+    w.dispatchEvent(new w.KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', bubbles: true }));
+    await sleep(200);
+    say(before && disp(wrap) === 'none', 'Esc 也能关', 'display=' + disp(wrap));
+
+    // 7. 开场视野：应当已经是近景
+    const iso = w.__iso;
+    say(!!iso, '拿到调试句柄 window.__iso');
+    if (iso && iso.view) {
+      const v = iso.view;
+      say(v.near === true, '开场就在近景（看得见自己与草木）',
+        'zi=' + v.zi + '  每格 ' + v.tw.toFixed(2) + 'px');
+      // 视野内确实有可画的资源
+      const c = v.center();
+      const R = Math.ceil(Math.max(v.w / v.tw, v.h / (v.th || 1))) + 4;
+      const nn = iso.nodes.inRect(c[0] - R, c[1] - R, c[0] + R, c[1] + R).length;
+      const vv = iso.veins.inRect(c[0] - R, c[1] - R, c[0] + R, c[1] + R).length;
+      say(nn + vv > 0, '视野里确实有采集点与矿脉可画', '采集点 ' + nn + ' 处、矿脉 ' + vv + ' 处');
+    }
+
+    // 8. 画布真的画了东西，而且画了人物（金顶/金环是独一份的金色）
+    const cv = d.getElementById('map');
+    const px = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    let paper = 0, gold = 0, total = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      total++;
+      if (r > 225 && g > 218 && b > 195) paper++;                  // 宣纸底色
+      if (r > 215 && g > 180 && b > 90 && b < 175 && r > b + 60) gold++;   // 金色
+    }
+    say(paper / total < 0.35, '画布主体不是空白宣纸（地形画出来了）',
+      '纸色占 ' + (paper / total * 100).toFixed(1) + '%');
+    say(gold > 20, '画布上找得着金色的人物标记', gold + ' 个像素');
+  } catch (e) {
+    say(false, '测试自己抛了异常', String(e && e.message || e));
+  }
+  finish();
+};
+</script>
+</body>
+</html>

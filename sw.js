@@ -1,7 +1,9 @@
 // 离线缓存：装到桌面或打进 APK 之后，没网也能进山水
-const CACHE = 'yunshan-v2';
+const CACHE = 'yunshan-v3';
+// 清单里少一个文件，addAll 就会整包失败（离线进不去），所以新增模块要记着补上
 const ASSETS = [
-  './', './index.html', './iso.html', './voxel.html', './manifest.json', './icon.svg',
+  './', './index.html', './iso.html', './voxel.html', './selftest.html',
+  './manifest.json', './icon.svg',
   './vendor/three.module.js',
   './src/main.js', './src/core/items.js', './src/core/noise.js', './src/core/terrain.js',
   './src/game/crafting.js', './src/game/craftgen.js', './src/game/inventory.js',
@@ -12,7 +14,7 @@ const ASSETS = [
   './src/iso/main2d.js', './src/iso/world2d.js', './src/iso/view2d.js',
   './src/iso/render2d.js', './src/iso/palette.js', './src/iso/edit2d.js',
   './src/iso/veins.js', './src/iso/nodes.js', './src/iso/skill.js',
-  './src/iso/codex.js', './src/iso/menu.js',
+  './src/iso/codex.js', './src/iso/menu.js', './src/iso/save.js', './src/iso/survival.js',
 ];
 
 self.addEventListener('install', (e) => {

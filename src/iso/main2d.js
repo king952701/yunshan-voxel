@@ -585,12 +585,20 @@ function screenOf(wx, wy, lift) {
 
 /** 矿脉露头与采空后的下沉动画 */
 function drawVeins(c) {
-  const R = Math.ceil(Math.max(view.w / view.tw, view.h / (view.th || 1))) + 6;
+  const tw = view.tw;
+  if (tw < 5) return;                    // 缩得太小就不画了，省得白遍历
+  const detail = view.near;              // 近景画立体矿石，中景点一个像素
+  const R = Math.min(240, Math.ceil(Math.max(view.w / tw, view.h / (view.th || 1))) + 6);
   const list = veins.inRect(c[0] - R, c[1] - R, c[0] + R, c[1] + R);
   for (const p of list) {
     if (p.cd > 0) continue;
     const s = screenOf(p.wx, p.wy, 1);
     const info = oreInfo(p.ore);
+    if (!detail) {
+      ctx.fillStyle = css(info.color, 1);
+      ctx.fillRect(s[0] - 1, s[1] - 1, 2, 2);
+      continue;
+    }
     // 灵矿自带一层微光，隔着老远也能认出来
     if (info.q >= 8) {
       diamond(s[0], s[1], view.tw, view.th, 1.15);
@@ -615,18 +623,43 @@ function drawVeins(c) {
     const s = screenOf(f.wx, f.wy, 1);
     const info = oreInfo(f.ore);
     ctx.globalAlpha = k;
-    diamond(s[0], s[1] + (1 - k) * view.th * 1.8, view.tw, view.th, 0.62 * (0.4 + 0.6 * k));
-    ctx.fillStyle = css(info.color, 0.6 + 0.4 * k);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,.4)';
-    ctx.stroke();
+    if (detail) {
+      diamond(s[0], s[1] + (1 - k) * view.th * 1.8, view.tw, view.th, 0.62 * (0.4 + 0.6 * k));
+      ctx.fillStyle = css(info.color, 0.6 + 0.4 * k);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.4)';
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = css(info.color, 0.6 + 0.4 * k);
+      ctx.fillRect(s[0] - 1, s[1] - 1, 2, 2);
+    }
     ctx.globalAlpha = 1;
   }
 }
 
-/** 旅人：就在视野中心那一格 */
+/** 旅人：就在视野中心那一格。缩到长卷上也要一眼找得着自己 */
 function drawPlayer(c) {
   const s = screenOf(c[0], c[1], 1);
+  if (!view.near) {
+    // 整幅长卷时人只剩一两个像素，所以画一圈金环加四面刻线
+    const r = 8;
+    ctx.strokeStyle = '#ffd88a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(s[0], s[1], r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s[0], s[1] - r - 6); ctx.lineTo(s[0], s[1] - r - 2);
+    ctx.moveTo(s[0], s[1] + r + 2); ctx.lineTo(s[0], s[1] + r + 6);
+    ctx.moveTo(s[0] - r - 6, s[1]); ctx.lineTo(s[0] - r - 2, s[1]);
+    ctx.moveTo(s[0] + r + 2, s[1]); ctx.lineTo(s[0] + r + 6, s[1]);
+    ctx.stroke();
+    ctx.fillStyle = '#e8c07a';
+    ctx.beginPath();
+    ctx.arc(s[0], s[1], 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
   ctx.fillStyle = '#2b2f38';
   ctx.fillRect(s[0] - 1, s[1] - 7, 3, 6);
   ctx.beginPath();
@@ -638,12 +671,19 @@ function drawPlayer(c) {
 
 /** 地表采集点：树画树冠、钓点画涟漪、兽画身形，一眼能分 */
 function drawNodes(c) {
-  const R = 40;
+  const tw = view.tw;
+  if (tw < 5) return;
+  const detail = view.near;
+  const R = Math.min(240, Math.ceil(Math.max(view.w / tw, view.h / (view.th || 1))) + 4);
   const list = nodes.inRect(c[0] - R, c[1] - R, c[0] + R, c[1] + R);
   for (const p of list) {
     const k = kindInfo(p.kind);
     const s = screenOf(p.wx, p.wy, 1);
     ctx.fillStyle = k.color;
+    if (!detail) {
+      ctx.fillRect(s[0] - 1, s[1] - 1, 2, 2);
+      continue;
+    }
     if (p.kind === 'tree') {
       ctx.beginPath();
       ctx.moveTo(s[0], s[1] - 10);
@@ -766,27 +806,26 @@ function frame(now) {
   ctx.putImageData(img, 0, 0);
 
   const c = view.center();
-  if (view.near) {
+  if (view.near && hover) {
     // 指向的格子描一圈金边，点下去才知道落在哪
-    if (hover) {
-      const p = view.projOf(hover[0], hover[1], terra.height(hover[0], hover[1]));
-      const s = view.toScreen(p[0], p[1]);
-      const hw = view.tw / 2, hh = view.th / 2;
-      ctx.strokeStyle = '#ffd88a';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(s[0] - hw, s[1]);
-      ctx.lineTo(s[0], s[1] - hh);
-      ctx.lineTo(s[0] + hw, s[1]);
-      ctx.lineTo(s[0], s[1] + hh);
-      ctx.closePath();
-      ctx.stroke();
-    }
-    drawVeins(c);
-    drawNodes(c);
-    if (settings.showPlayer) drawPlayer(c);
-    drawGather(c);
+    const p = view.projOf(hover[0], hover[1], terra.height(hover[0], hover[1]));
+    const s = view.toScreen(p[0], p[1]);
+    const hw = view.tw / 2, hh = view.th / 2;
+    ctx.strokeStyle = '#ffd88a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(s[0] - hw, s[1]);
+    ctx.lineTo(s[0], s[1] - hh);
+    ctx.lineTo(s[0] + hw, s[1]);
+    ctx.lineTo(s[0], s[1] + hh);
+    ctx.closePath();
+    ctx.stroke();
   }
+  // 这三样不只在近景画：缩到长卷上也得看得见自己在哪、附近有什么
+  drawVeins(c);
+  drawNodes(c);
+  if (settings.showPlayer) drawPlayer(c);
+  if (view.near) drawGather(c);
 
   const sky = skyOf();
   canvas.style.filter = skyFilter(sky.dayF, sky.dawn);
@@ -794,15 +833,16 @@ function frame(now) {
   el.hud.style.display = settings.showHud ? 'block' : 'none';
   el.coord.textContent = `${c[0]}, ${c[1]}`;
   el.zoom.textContent = view.near
-    ? `近景 · 每格 ${view.tw.toFixed(1)}px`
-    : `长卷 · ${ZOOM_MULTS[view.zi]}×`;
+    ? `近景 · 每格 ${view.tw.toFixed(1)}px（滚轮缩小看长卷）`
+    : `长卷 · ${ZOOM_MULTS[view.zi]}×（滚轮放大到近景动土）`;
   el.clock.textContent = clockString();
   el.perf.textContent = `${Math.round(fps)} FPS`;
   el.vitals.textContent = `气血 ${Math.round(surv.hp)} · 饱食 ${Math.round(surv.food)}`
     + ` · 渴饮 ${Math.round(surv.water)} · ${surv.status()}`;
   el.vitals.style.color = (surv.hp <= 25 || surv.food <= 15 || surv.water <= 15) ? '#ff8a6a'
     : (surv.hp < 60 || surv.food < 35 || surv.water < 35) ? '#e8c07a' : '#c6d0db';
-  if (!scroll.done) {
+  // 长卷在后台慢慢画；人在近景时不必把这行进度浮在眼前
+  if (!scroll.done && !view.near) {
     el.prog.textContent = `绘制山水长卷 ${Math.round(scroll.row / scroll.h * 100)}%`;
     el.prog.style.display = 'block';
   } else {
@@ -843,7 +883,16 @@ if (read(saveState)) {
 } else {
   view.lookAt(0, 0);
   startingKit(inv);
-  say('新开一卷山水：拖动漫游，滚轮放大到近景才好动土');
+  say('新开一卷山水：拖动漫游，滚轮缩小可退看整幅长卷');
+}
+
+// 开场就落到看得清细节的一档。老存档常停在「整图铺满」那一档，
+// 每格不到一个像素，人跟草木都看不见，会让人以为资源没加载。
+if (!view.near) {
+  const [cx, cy] = view.center();
+  view.zi = view.ziForDetail();
+  view.lookAt(cx, cy);
+  view.clampCam();
 }
 renderBag();
 requestAnimationFrame(frame);

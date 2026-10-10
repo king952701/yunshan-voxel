@@ -3,6 +3,7 @@ import { WORLD } from './world2d.js';
 
 // 相对「整图铺满」的倍数：1 = 一屏看完 8000x8000
 export const ZOOM_MULTS = [1, 2, 4, 8, 16, 32, 64, 128];
+export const NEAR_TW = 8;   // 每格这么多像素才算近景：再小就只剩色块，看不出颗粒
 
 export class View2D {
   constructor() {
@@ -23,7 +24,19 @@ export class View2D {
   get th() { return this.tw / 2; }
 
   /** 近景档：每格 >= 8 像素时逐格绘制立体块 */
-  get near() { return this.tw >= 8; }
+  get near() { return this.tw >= NEAR_TW; }
+
+  /**
+   * 开场该落在哪一档：保证每格至少 NEAR_TW 像素。
+   * 屏幕再小也看得见自己与脚边的草木，不至于只看到一片色块。
+   */
+  ziForDetail() {
+    const fit = this.fitTw();
+    for (let i = 0; i < ZOOM_MULTS.length; i++) {
+      if (fit * ZOOM_MULTS[i] >= NEAR_TW) return i;
+    }
+    return ZOOM_MULTS.length - 1;
+  }
 
   /** 世界格 -> 投影空间像素（不含视口平移） */
   projOf(wx, wy, h) {
