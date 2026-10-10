@@ -1,0 +1,11 @@
+{
+  "appId": "com.yunshan.voxel",
+  "appName": "云山录",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

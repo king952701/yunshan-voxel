@@ -1,0 +1,14 @@
+{
+  "name": "云山录 · 山水长卷",
+  "short_name": "云山录",
+  "description": "八千格中式山水，挖地营建、采矿采药、八百式百工",
+  "start_url": "./iso.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0b0f16",
+  "theme_color": "#0b0f16",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

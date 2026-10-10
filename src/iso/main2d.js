@@ -98,21 +98,71 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+// ------------------------------------------------------------------ 触控
+// 单指拖 = 漫游；双指张合 = 缩放；轻点 = 选中脚边那一格（真要动土按下方按钮）
+const touchPts = new Map();
+let pinchD = 0, tapT = 0, tapMove = 0, tapX = 0, tapY = 0;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    touchPts.set(t.identifier, [t.clientX, t.clientY]);
+    tapT = performance.now();
+    tapMove = 0;
+    tapX = t.clientX;
+    tapY = t.clientY;
+  } else if (e.touches.length === 2) {
+    const [a, b] = [e.touches[0], e.touches[1]];
+    pinchD = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    const p = touchPts.get(t.identifier);
+    if (!p) return;
+    const dx = t.clientX - p[0], dy = t.clientY - p[1];
+    tapMove += Math.abs(dx) + Math.abs(dy);
+    view.pan(dx * RS, dy * RS);
+    touchPts.set(t.identifier, [t.clientX, t.clientY]);
+    hover = view.near ? pickCell(t.clientX * RS, t.clientY * RS) : null;
+  } else if (e.touches.length === 2) {
+    const [a, b] = [e.touches[0], e.touches[1]];
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (pinchD > 0) {
+      const step = d > pinchD * 1.14 ? 1 : d < pinchD * 0.88 ? -1 : 0;
+      if (step) {
+        view.zoomAt(step, (a.clientX + b.clientX) / 2 * RS, (a.clientY + b.clientY) / 2 * RS);
+        pinchD = d;
+      }
+    } else {
+      pinchD = d;
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  if (e.touches.length > 0) return;
+  if (tapMove < 10 && performance.now() - tapT < 320) {
+    hover = view.near ? pickCell(tapX * RS, tapY * RS) : null;
+    if (view.near && hover) say(`选中 ${hover[0]}, ${hover[1]}　按下方「掘土/垒材」动土`);
+    else if (!view.near) say('双指张开放大到近景，才好动土');
+  }
+  touchPts.clear();
+  pinchD = 0;
+}, { passive: false });
+
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (menuApi) menuApi.toggle(); return; }
   if (menuApi && menuApi.isOpen()) return;   // 菜单开着时不响应游戏按键
   keys[e.code] = true;
   if (e.code === 'KeyE') startGather();
-  if (e.code === 'KeyC') {
-    craftOpen = !craftOpen;
-    el.craft.style.display = craftOpen ? 'block' : 'none';
-    if (craftOpen) { storeOpen = false; el.store.style.display = 'none'; renderCraft(); }
-  }
-  if (e.code === 'KeyB') {
-    storeOpen = !storeOpen;
-    el.store.style.display = storeOpen ? 'block' : 'none';
-    if (storeOpen) { craftOpen = false; el.craft.style.display = 'none'; renderStore(); }
-  }
+  if (e.code === 'KeyC') toggleCraft();
+  if (e.code === 'KeyB') toggleStore();
   if (e.code === 'KeyR') view.lookAt(0, 0);
   const n = e.code.match(/^Digit([1-9])$/);
   if (n) {
@@ -312,6 +362,7 @@ function renderStore() {
   bar.className = 'btns';
   bar.style.cssText = 'display:flex;gap:6px;padding:8px 0 2px';
   const mk = (label, fn) => {
+
     const b = document.createElement('button');
     b.textContent = label;
     b.onclick = fn;
@@ -329,6 +380,18 @@ function renderStore() {
     renderBag(); renderStore();
   }));
   el.storeBody.appendChild(bar);
+}
+
+function toggleCraft() {
+  craftOpen = !craftOpen;
+  el.craft.style.display = craftOpen ? 'block' : 'none';
+  if (craftOpen) { storeOpen = false; el.store.style.display = 'none'; renderCraft(); }
+}
+
+function toggleStore() {
+  storeOpen = !storeOpen;
+  el.store.style.display = storeOpen ? 'block' : 'none';
+  if (storeOpen) { craftOpen = false; el.craft.style.display = 'none'; renderStore(); }
 }
 
 const CRAFT_PAGE = 40;
@@ -685,6 +748,22 @@ menuApi = createMenu({
   },
 });
 document.getElementById('gear').onclick = () => menuApi.toggle();
+
+// 手机上的一排动作按钮（触屏没有右键与快捷键）
+const touchBar = document.getElementById('touch');
+if (touchBar) {
+  for (const b of touchBar.querySelectorAll('button')) {
+    b.onclick = () => {
+      const a = b.dataset.act;
+      if (a === 'dig') act('dig');
+      else if (a === 'place') act('place');
+      else if (a === 'gather') startGather();
+      else if (a === 'craft') toggleCraft();
+      else if (a === 'store') toggleStore();
+      else if (a === 'menu') menuApi.toggle();
+    };
+  }
+}
 
 // 控制台与自动化用的句柄：window.__iso.view.lookAt(x, y) 之类
 window.__iso = {
