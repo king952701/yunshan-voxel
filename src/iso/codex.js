@@ -20,6 +20,7 @@ export const CATS = [
   { key: 'block', label: '方块' },
   { key: 'recipe', label: '配方' },
   { key: 'skill', label: '技能' },
+  { key: 'life', label: '生存' },
   { key: 'quality', label: '品级' },
   { key: 'control', label: '操作' },
   { key: 'world', label: '山川' },
@@ -62,6 +63,22 @@ export function buildCodex(skills) {
         + `采空后 ${NODE_CD} 秒（5 分钟）自行复生。每 ${NB}×${NB} 的片区按地形长出几处：`
         + `${sk ? sk.desc : ''}`,
       tags: `${k.name} 采集点 ${sk ? sk.name : ''} ${k.tool || '徒手'}`,
+    });
+  }
+
+  const LIFE = [
+    ['气血', '受伤、挨饿、缺水都会掉气血；敷药、服丹、进食可补回。归零则力竭倒下。',
+      '敷药可回（草药膏、金疮药、丹药），进食也小幅回气。'],
+    ['饱食', '一昼夜约掉六成饱食，见底后开始掉气血。', '烤肉、炖肉、干粮、鱼与果脯都能垫肚子，越精细的越顶饿。'],
+    ['渴饮', '比饱食掉得更快，一昼夜约掉八成。', '走到水边按 F 可直接捧水喝；茶、酒、浆、露也能解渴。'],
+    ['夜里遇袭', '入夜之后人在野外、附近有野兽，会被扑上来咬一口。', '手上有兵器可逼退，赤手空拳只能挨。天亮或离开野兽便无事。'],
+    ['力竭倒下', '气血归零后在自家门口（图心）醒来。', '行囊里的东西掉一半，但家伙（镐斧铲镰剑钓竿）会留下，好让你翻身。'],
+  ];
+  for (const [title, body, sub] of LIFE) {
+    out.push({
+      cat: 'life', title, icon: '❤', color: '#d84a6a',
+      sub: '生存', body: `${body}　${sub}`,
+      tags: `${title} 生存 气血 饱食 渴饮 夜袭`,
     });
   }
 

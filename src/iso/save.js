@@ -36,7 +36,7 @@ function unpackSlots(inv, list) {
 }
 
 export function capture(o) {
-  const { inv, store, skills, terra, veins, nodes, view, settings, mat } = o;
+  const { inv, store, skills, terra, veins, nodes, view, settings, mat, surv } = o;
 
   const deltas = [];
   for (const [k, d] of terra.deltas) deltas.push([k, d.h, d.t, d.mat || 0]);
@@ -55,6 +55,7 @@ export function capture(o) {
     bag: packSlots(inv), store: packSlots(store),
     sk: { lv: { ...skills.lv }, xp: { ...skills.xp } },
     mat, set: { ...settings },
+    surv: surv ? { hp: surv.hp, food: surv.food, water: surv.water } : null,
     cam: [view.zi, Math.round(view.camPX), Math.round(view.camPY)],
     terra: deltas, vcd, ncd,
   };
@@ -87,6 +88,11 @@ export function restore(o, data) {
   }
 
   if (data.mat != null && o.setMat) o.setMat(data.mat);
+  if (data.surv && o.surv) {
+    o.surv.hp = data.surv.hp;
+    o.surv.food = data.surv.food;
+    o.surv.water = data.surv.water;
+  }
   if (data.set) Object.assign(settings, data.set);
   if (data.cam) {
     view.zi = data.cam[0] || 0;

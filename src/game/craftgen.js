@@ -179,7 +179,11 @@ for (const m of FOOD_MATS) {
 for (const herb of HERB_IDS.slice(0, 16)) {
   const hm = { n: ITEMS[herb].name, id: herb, q: ITEMS[herb].q };
   for (const f of LIQUOR_FORMS) {
-    const extra = { food: Math.max(3, Math.round(f.food * mul(hm.q))) };
+    // 酒水除了垫肚子，主要用来解渴
+    const extra = {
+      food: Math.max(3, Math.round(f.food * mul(hm.q))),
+      water: Math.max(8, Math.round((f.food * 2.4 + 8) * mul(hm.q))),
+    };
     if (f.heal) extra.heal = Math.max(4, Math.round(f.heal * mul(hm.q)));
     put('liquor', hm.n + f.n, hm.q, extra, hm, 1, '🍶', 8);
   }

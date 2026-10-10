@@ -3,7 +3,7 @@
 import { Map2D, Scroll, WORLD } from './world2d.js';
 import { View2D, ZOOM_MULTS } from './view2d.js';
 import { renderFar, renderNear } from './render2d.js';
-import { skyFilter } from './palette.js';
+import { skyFilter, T } from './palette.js';
 import {
   Terra, Inventory, startingKit, BUILD_MATS, bestPick, bestTool, STORE_SIZE,
 } from './edit2d.js';
@@ -16,6 +16,7 @@ import {
 import { itemName, itemColor, qualityOf, ITEMS, BRICK } from '../core/items.js';
 import { createMenu } from './menu.js';
 import { write, read, clearSave, saveInfo } from './save.js';
+import { Survival, MAX_STAT } from './survival.js';
 
 const params = new URLSearchParams(location.search);
 const SEED = Number(params.get('seed') || 20261010) | 0;
@@ -35,6 +36,7 @@ const el = {
   vein: document.getElementById('vein'), hud: document.getElementById('hud'),
   store: document.getElementById('store'), storeBody: document.getElementById('store-body'),
   storeCap: document.getElementById('store-cap'),
+  vitals: document.getElementById('vitals'),
 };
 
 const settings = { daySpeed: 1, showHint: true, showPlayer: true, showHud: true };
@@ -47,12 +49,13 @@ const terra = new Terra(map);
 const veins = new Veins(map);
 const nodes = new Nodes(map);
 const skills = new Skills();
+const surv = new Survival();   // 气血、饱食、渴饮
 const inv = new Inventory();
 const store = new Inventory(STORE_SIZE);   // 仓库一千格
 
 // 存档句柄：地形、矿脉、采集点都是按种子确定性生成的，所以只存改动、格子与冷却
 const saveState = {
-  inv, store, skills, terra, veins, nodes, view, settings,
+  inv, store, skills, terra, veins, nodes, view, settings, surv,
   get mat() { return selMat; },
   setMat: (v) => { selMat = v; },
 };
@@ -176,6 +179,7 @@ window.addEventListener('keydown', (e) => {
   if (menuApi && menuApi.isOpen()) return;   // 菜单开着时不响应游戏按键
   keys[e.code] = true;
   if (e.code === 'KeyE') startGather();
+  if (e.code === 'KeyF') eatOrDrink();
   if (e.code === 'KeyC') toggleCraft();
   if (e.code === 'KeyB') toggleStore();
   if (e.code === 'KeyR') view.lookAt(0, 0);
@@ -330,6 +334,61 @@ function renderBag() {
   el.bag.appendChild(cap);
   el.mat.textContent = itemName(selMat);
   el.mat.style.color = itemColor(selMat);
+}
+
+// ------------------------------------------------------------------ 生存
+/** 脚下或四邻有水，可以捧起来喝 */
+function nearWater() {
+  const [wx, wy] = view.center();
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const t = terra.type(wx + dx, wy + dy);
+      if (t === T.WATER || t === T.DEEP) return true;
+    }
+  }
+  return false;
+}
+
+/** 附近有没有野兽（入夜会扑人） */
+function nearestBeast(wx, wy, r = 6) {
+  let best = null, bd = r * r;
+  for (const p of nodes.inRect(wx - r, wy - r, wx + r, wy + r)) {
+    if (p.kind !== 'beast') continue;
+    const d = (p.wx - wx) * (p.wx - wx) + (p.wy - wy) * (p.wy - wy);
+    if (d <= bd) { bd = d; best = p; }
+  }
+  return best;
+}
+
+/** F 键：先救命、再解渴、再充饥；渴了又在水边就直接捧水喝 */
+function eatOrDrink() {
+  if (surv.water < 85 && nearWater()) {
+    const n = surv.drink();
+    say(n ? `捧起水喝了几口，渴饮 +${n}` : '已经喝不下了');
+    renderBag();
+    return;
+  }
+  const r = surv.auto(inv);
+  if (!r) {
+    say(nearWater()
+      ? '还不饿也不渴（真要解渴就再按一次 F）'
+      : '行囊里没有能吃喝的：钓鱼、打猎、拾野果，或走到水边捧水喝');
+    return;
+  }
+  const verb = r.kind === 'hp' ? '敷' : r.kind === 'water' ? '饮' : '吃';
+  const label = r.kind === 'hp' ? '气血' : r.kind === 'water' ? '渴饮' : '饱食';
+  say(`${verb}下${r.name}，${label} +${r.v}`);
+  renderBag();
+}
+
+/** 力竭倒下：在自家门口醒来，行囊掉一半 */
+function collapseAtHome() {
+  const lost = surv.collapse(inv);
+  view.lookAt(0, 0);
+  renderBag();
+  say(lost.length
+    ? `力竭倒下……在自家门口醒来，掉了 ${lost.slice(0, 3).join('、')}${lost.length > 3 ? ' 等' : ''}`
+    : '力竭倒下……在自家门口醒来，身上没多少东西可掉');
 }
 
 // ------------------------------------------------------------------ 仓库
@@ -676,6 +735,25 @@ function frame(now) {
   tickGather(dt);
   if (veins.tick(dt) > 0) say('矿脉复生');
   nodes.tick(dt);
+
+  // 生存：饥渴跟着昼夜走，把昼夜调成静止，饥渴也就停了
+  const dayFrac = dt * (settings.daySpeed || 0) / DAY_SEC;
+  if (dayFrac > 0) {
+    surv.tick(dayFrac);
+    for (const w of surv.warnings()) say(w);
+  }
+  if (view.near) {
+    const c0 = view.center();
+    const beast = nearestBeast(c0[0], c0[1], 6);
+    const sword = bestTool(inv, 'sword');
+    const raid = surv.tickRaid(dt, {
+      isNight: skyOf().dayF < 0.28,
+      beastName: beast ? '野兽' : null,
+      weaponName: sword ? itemName(sword.id) : null,
+    });
+    if (raid) say(raid.msg);
+  }
+  if (surv.hp <= 0) collapseAtHome();
   if (toastLeft > 0) toastLeft -= dt;
 
   saveT += dt;
@@ -720,6 +798,10 @@ function frame(now) {
     : `长卷 · ${ZOOM_MULTS[view.zi]}×`;
   el.clock.textContent = clockString();
   el.perf.textContent = `${Math.round(fps)} FPS`;
+  el.vitals.textContent = `气血 ${Math.round(surv.hp)} · 饱食 ${Math.round(surv.food)}`
+    + ` · 渴饮 ${Math.round(surv.water)} · ${surv.status()}`;
+  el.vitals.style.color = (surv.hp <= 25 || surv.food <= 15 || surv.water <= 15) ? '#ff8a6a'
+    : (surv.hp < 60 || surv.food < 35 || surv.water < 35) ? '#e8c07a' : '#c6d0db';
   if (!scroll.done) {
     el.prog.textContent = `绘制山水长卷 ${Math.round(scroll.row / scroll.h * 100)}%`;
     el.prog.style.display = 'block';
@@ -792,6 +874,7 @@ menuApi = createMenu({
     inv.slots.fill(null);
     store.slots.fill(null);
     for (const k of Object.keys(skills.lv)) { skills.lv[k] = 1; skills.xp[k] = 0; }
+    surv.hp = MAX_STAT; surv.food = MAX_STAT; surv.water = MAX_STAT;
     startingKit(inv);
     view.lookAt(0, 0);
     renderBag();
@@ -810,6 +893,7 @@ if (touchBar) {
       if (a === 'dig') act('dig');
       else if (a === 'place') act('place');
       else if (a === 'gather') startGather();
+      else if (a === 'eat') eatOrDrink();
       else if (a === 'craft') toggleCraft();
       else if (a === 'store') toggleStore();
       else if (a === 'menu') menuApi.toggle();

@@ -76,7 +76,7 @@ export const ITEMS = {
   117: { name: '炖肉', stack: 16, icon: '🍲', color: '#a8623c', q: 4, food: 65 },
   118: { name: '果脯', stack: 32, icon: '🫒', color: '#a05fb0', q: 2, food: 16 },
   119: { name: '草药膏', stack: 16, icon: '🌿', color: '#6fbf5a', q: 3, heal: 35 },
-  120: { name: '清茶', stack: 16, icon: '🍵', color: '#9fc98a', q: 3, food: 6, heal: 12 },
+  120: { name: '清茶', stack: 16, icon: '🍵', color: '#9fc98a', q: 3, food: 6, water: 40, heal: 12 },
   121: { name: '木铲', stack: 1, icon: '🥄', color: '#a3703a', q: 2, tool: { kind: 'shovel', speed: 2.0, tier: 1 } },
   122: { name: '石铲', stack: 1, icon: '🥄', color: '#8d949c', q: 3, tool: { kind: 'shovel', speed: 3.0, tier: 2 } },
   123: { name: '铁铲', stack: 1, icon: '🥄', color: '#cfd6dc', q: 5, tool: { kind: 'shovel', speed: 4.2, tier: 3 } },
