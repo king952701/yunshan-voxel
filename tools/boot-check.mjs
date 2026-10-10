@@ -58,17 +58,19 @@ const els = new Map();
 const store = new Map();
 const frames = [];
 
-globalThis.document = {
-  getElementById(id) {
-    if (!els.has(id)) els.set(id, elStub(id));
-    return els.get(id);
-  },
-  createElement: (tag) => elStub(tag),
-  querySelector: () => elStub(), querySelectorAll: () => [],
-  addEventListener() {}, removeEventListener() {},
-  body: elStub('body'), documentElement: elStub('html'),
-};
-globalThis.window = {
+// 往全局上挂浏览器对象。不能直接赋值：Node 22 起 navigator 是只读 getter，
+// 一赋值就抛 TypeError（Node 20 没有这个对象，赋值反而没事），
+// 所以先看描述符，碰上只有 getter 的就用 defineProperty 覆盖。
+function setGlobal(name, value) {
+  const d = Object.getOwnPropertyDescriptor(globalThis, name);
+  if (d && !d.writable && !d.set) {
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  } else {
+    globalThis[name] = value;
+  }
+}
+
+const win = {
   addEventListener() {}, removeEventListener() {},
   devicePixelRatio: 1, innerWidth: W, innerHeight: H,
   location: { search: '', href: 'https://example.invalid/iso.html' },
@@ -81,14 +83,26 @@ globalThis.window = {
   },
   matchMedia: () => ({ matches: false, addEventListener() {} }),
 };
-globalThis.localStorage = globalThis.window.localStorage;
-globalThis.location = globalThis.window.location;
-globalThis.devicePixelRatio = 1;
-globalThis.requestAnimationFrame = globalThis.window.requestAnimationFrame;
-globalThis.cancelAnimationFrame = () => {};
-globalThis.addEventListener = () => {};
-globalThis.self = globalThis.window;
-globalThis.navigator = globalThis.navigator || { userAgent: 'node' };
+
+setGlobal('document', {
+  getElementById(id) {
+    if (!els.has(id)) els.set(id, elStub(id));
+    return els.get(id);
+  },
+  createElement: (tag) => elStub(tag),
+  querySelector: () => elStub(), querySelectorAll: () => [],
+  addEventListener() {}, removeEventListener() {},
+  body: elStub('body'), documentElement: elStub('html'),
+});
+setGlobal('window', win);
+setGlobal('localStorage', win.localStorage);
+setGlobal('location', win.location);
+setGlobal('devicePixelRatio', 1);
+setGlobal('requestAnimationFrame', win.requestAnimationFrame);
+setGlobal('cancelAnimationFrame', () => {});
+setGlobal('addEventListener', () => {});
+setGlobal('self', win);
+setGlobal('navigator', { userAgent: 'node', maxTouchPoints: 0 });
 
 let bad = 0;
 function report(step, ok, err) {
