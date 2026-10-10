@@ -91,6 +91,10 @@ export const ITEMS = {
   132: { name: '金疮药', stack: 16, icon: '🧪', color: '#d84a6a', heal: 60 },
   133: { name: '干粮', stack: 16, icon: '🍱', color: '#c9a05a', food: 80 },
   134: { name: '重铠', stack: 1, icon: '🦺', color: '#8e97a3', armor: 9 },
+  // 矿脉产出（埋在地表之下，须持矿镐开采）
+  135: { name: '玉石', stack: 64, icon: '🟩', color: '#6fc7a8' },
+  136: { name: '朱砂', stack: 64, icon: '🟥', color: '#c0392b' },
+  137: { name: '铜矿', stack: 64, icon: '🟧', color: '#b87333' },
 };
 
 // 每种方块的代表色（用于 UI 与 2.5D 长卷着色）
