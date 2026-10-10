@@ -8,6 +8,7 @@ export {
   PLANK, TILE, WALL, LANTERN, ORE_IRON, ORE_COAL, SNOW, GRAVEL, BERRY, TORCH,
   BRICK, BEAM, WINDOW, MAT, BANNER, STONE_LAMP, EAVE, GLAZE_TILE, CRATE, STELE,
   ROOF, GATE, BLOCKS, ITEMS, blockBaseColor, itemName, itemIcon, itemColor,
+  QUALITY, qualityOf,
 } from '../core/items.js';
 
 // ---------------------------------------------------------------------------

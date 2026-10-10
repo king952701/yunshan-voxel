@@ -127,4 +127,11 @@ export class Terra {
     this.deltas.set(Terra.key(wx, wy), { h: h + 1, t: T.DUG, mat: matId });
     return { ok: true, msg: `垒上${itemName(matId)}` };
   }
+
+  /** 复原全部动土：改动层清空，山水回到最初的模样 */
+  reset() {
+    const n = this.deltas.size;
+    this.deltas.clear();
+    return n;
+  }
 }

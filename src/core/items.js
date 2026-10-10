@@ -54,48 +54,96 @@ export const STICK = 100, IRON = 101, BERRY_FRUIT = 103, MEAT = 104, CHARCOAL = 
   RATTAN_ARMOR = 128, IRON_ARMOR = 129, GLAZE = 130, MORTAR = 131,
   PANACEA = 132, RATION = 133, HEAVY_ARMOR = 134;
 
-/** 非方块类物品（工具、材料、食物） */
+/** 非方块类物品（工具、材料、食物）。q = 品级 1~10，攻防与效力按品级折算 */
 export const ITEMS = {
-  100: { name: '木棍', stack: 64, icon: '🥢', color: '#a3703a' },
-  101: { name: '铁锭', stack: 64, icon: '⚙️', color: '#cfd6dc' },
-  102: { name: '木镐', stack: 1, icon: '⛏️', color: '#a3703a', tool: { kind: 'pickaxe', speed: 2.2, tier: 1 } },
-  103: { name: '野果', stack: 32, icon: '🫐', color: '#7a4bd0', food: 6 },
-  104: { name: '生肉', stack: 32, icon: '🍖', color: '#c05a4e', food: 14 },
-  105: { name: '石斧', stack: 1, icon: '🪓', color: '#8d949c', tool: { kind: 'axe', speed: 2.6, tier: 2 } },
-  106: { name: '铁镐', stack: 1, icon: '⛏️', color: '#cfd6dc', tool: { kind: 'pickaxe', speed: 4.5, tier: 3 } },
-  107: { name: '石镐', stack: 1, icon: '⛏️', color: '#8d949c', tool: { kind: 'pickaxe', speed: 3.2, tier: 2 } },
-  108: { name: '铁剑', stack: 1, icon: '🗡️', color: '#dfe6ec', tool: { kind: 'sword', speed: 1.4, tier: 3, damage: 16 } },
-  109: { name: '石剑', stack: 1, icon: '🗡️', color: '#9aa1a9', tool: { kind: 'sword', speed: 1.2, tier: 2, damage: 11 } },
-  110: { name: '木剑', stack: 1, icon: '🗡️', color: '#a3703a', tool: { kind: 'sword', speed: 1.0, tier: 1, damage: 7 } },
-  111: { name: '木斧', stack: 1, icon: '🪓', color: '#a3703a', tool: { kind: 'axe', speed: 2.0, tier: 1 } },
-  112: { name: '木炭', stack: 64, icon: '⬛', color: '#2e2e2e' },
-  113: { name: '竹纤维', stack: 64, icon: '🧵', color: '#9ccf6a' },
-  114: { name: '烤肉', stack: 32, icon: '🍗', color: '#c8794a', food: 38 },
-  115: { name: '绳索', stack: 64, icon: '🪢', color: '#b59b6a' },
-  116: { name: '粗布', stack: 64, icon: '🧣', color: '#ddd0b8' },
-  117: { name: '炖肉', stack: 16, icon: '🍲', color: '#a8623c', food: 65 },
-  118: { name: '果脯', stack: 32, icon: '🫒', color: '#a05fb0', food: 16 },
-  119: { name: '草药膏', stack: 16, icon: '🌿', color: '#6fbf5a', heal: 35 },
-  120: { name: '清茶', stack: 16, icon: '🍵', color: '#9fc98a', food: 6, heal: 12 },
-  121: { name: '木铲', stack: 1, icon: '🥄', color: '#a3703a', tool: { kind: 'shovel', speed: 2.0, tier: 1 } },
-  122: { name: '石铲', stack: 1, icon: '🥄', color: '#8d949c', tool: { kind: 'shovel', speed: 3.0, tier: 2 } },
-  123: { name: '铁铲', stack: 1, icon: '🥄', color: '#cfd6dc', tool: { kind: 'shovel', speed: 4.2, tier: 3 } },
-  124: { name: '木镰', stack: 1, icon: '🌾', color: '#a3703a', tool: { kind: 'sickle', speed: 2.0, tier: 1 } },
-  125: { name: '石镰', stack: 1, icon: '🌾', color: '#8d949c', tool: { kind: 'sickle', speed: 3.0, tier: 2 } },
-  126: { name: '铁镰', stack: 1, icon: '🌾', color: '#cfd6dc', tool: { kind: 'sickle', speed: 4.2, tier: 3 } },
-  127: { name: '铁斧', stack: 1, icon: '🪓', color: '#cfd6dc', tool: { kind: 'axe', speed: 4.5, tier: 3 } },
-  128: { name: '藤甲', stack: 1, icon: '🦺', color: '#8a6a4a', armor: 3 },
-  129: { name: '铁甲', stack: 1, icon: '🦺', color: '#cfd6dc', armor: 6 },
-  130: { name: '琉璃', stack: 64, icon: '💠', color: '#4a9ab0' },
-  131: { name: '灰泥', stack: 64, icon: '🧱', color: '#cfc7b8' },
-  132: { name: '金疮药', stack: 16, icon: '🧪', color: '#d84a6a', heal: 60 },
-  133: { name: '干粮', stack: 16, icon: '🍱', color: '#c9a05a', food: 80 },
-  134: { name: '重铠', stack: 1, icon: '🦺', color: '#8e97a3', armor: 9 },
-  // 矿脉产出（埋在地表之下，须持矿镐开采）
-  135: { name: '玉石', stack: 64, icon: '🟩', color: '#6fc7a8' },
-  136: { name: '朱砂', stack: 64, icon: '🟥', color: '#c0392b' },
-  137: { name: '铜矿', stack: 64, icon: '🟧', color: '#b87333' },
+  100: { name: '木棍', stack: 64, icon: '🥢', color: '#a3703a', q: 2 },
+  101: { name: '铁锭', stack: 64, icon: '⚙️', color: '#cfd6dc', q: 4 },
+  102: { name: '木镐', stack: 1, icon: '⛏️', color: '#a3703a', q: 2, tool: { kind: 'pickaxe', speed: 2.2, tier: 1 } },
+  103: { name: '野果', stack: 32, icon: '🫐', color: '#7a4bd0', q: 1, food: 6 },
+  104: { name: '生肉', stack: 32, icon: '🍖', color: '#c05a4e', q: 1, food: 14 },
+  105: { name: '石斧', stack: 1, icon: '🪓', color: '#8d949c', q: 3, tool: { kind: 'axe', speed: 2.6, tier: 2 } },
+  106: { name: '铁镐', stack: 1, icon: '⛏️', color: '#cfd6dc', q: 5, tool: { kind: 'pickaxe', speed: 4.5, tier: 3 } },
+  107: { name: '石镐', stack: 1, icon: '⛏️', color: '#8d949c', q: 3, tool: { kind: 'pickaxe', speed: 3.2, tier: 2 } },
+  108: { name: '铁剑', stack: 1, icon: '🗡️', color: '#dfe6ec', q: 6, tool: { kind: 'sword', speed: 1.4, tier: 3, damage: 16 } },
+  109: { name: '石剑', stack: 1, icon: '🗡️', color: '#9aa1a9', q: 4, tool: { kind: 'sword', speed: 1.2, tier: 2, damage: 11 } },
+  110: { name: '木剑', stack: 1, icon: '🗡️', color: '#a3703a', q: 2, tool: { kind: 'sword', speed: 1.0, tier: 1, damage: 7 } },
+  111: { name: '木斧', stack: 1, icon: '🪓', color: '#a3703a', q: 2, tool: { kind: 'axe', speed: 2.0, tier: 1 } },
+  112: { name: '木炭', stack: 64, icon: '⬛', color: '#2e2e2e', q: 1 },
+  113: { name: '竹纤维', stack: 64, icon: '🧵', color: '#9ccf6a', q: 1 },
+  114: { name: '烤肉', stack: 32, icon: '🍗', color: '#c8794a', q: 3, food: 38 },
+  115: { name: '绳索', stack: 64, icon: '🪢', color: '#b59b6a', q: 2 },
+  116: { name: '粗布', stack: 64, icon: '🧣', color: '#ddd0b8', q: 2 },
+  117: { name: '炖肉', stack: 16, icon: '🍲', color: '#a8623c', q: 4, food: 65 },
+  118: { name: '果脯', stack: 32, icon: '🫒', color: '#a05fb0', q: 2, food: 16 },
+  119: { name: '草药膏', stack: 16, icon: '🌿', color: '#6fbf5a', q: 3, heal: 35 },
+  120: { name: '清茶', stack: 16, icon: '🍵', color: '#9fc98a', q: 3, food: 6, heal: 12 },
+  121: { name: '木铲', stack: 1, icon: '🥄', color: '#a3703a', q: 2, tool: { kind: 'shovel', speed: 2.0, tier: 1 } },
+  122: { name: '石铲', stack: 1, icon: '🥄', color: '#8d949c', q: 3, tool: { kind: 'shovel', speed: 3.0, tier: 2 } },
+  123: { name: '铁铲', stack: 1, icon: '🥄', color: '#cfd6dc', q: 5, tool: { kind: 'shovel', speed: 4.2, tier: 3 } },
+  124: { name: '木镰', stack: 1, icon: '🌾', color: '#a3703a', q: 2, tool: { kind: 'sickle', speed: 2.0, tier: 1 } },
+  125: { name: '石镰', stack: 1, icon: '🌾', color: '#8d949c', q: 3, tool: { kind: 'sickle', speed: 3.0, tier: 2 } },
+  126: { name: '铁镰', stack: 1, icon: '🌾', color: '#cfd6dc', q: 5, tool: { kind: 'sickle', speed: 4.2, tier: 3 } },
+  127: { name: '铁斧', stack: 1, icon: '🪓', color: '#cfd6dc', q: 5, tool: { kind: 'axe', speed: 4.5, tier: 3 } },
+  128: { name: '藤甲', stack: 1, icon: '🦺', color: '#8a6a4a', q: 3, armor: 3 },
+  129: { name: '铁甲', stack: 1, icon: '🦺', color: '#cfd6dc', q: 5, armor: 6 },
+  130: { name: '琉璃', stack: 64, icon: '💠', color: '#4a9ab0', q: 4 },
+  131: { name: '灰泥', stack: 64, icon: '🧱', color: '#cfc7b8', q: 2 },
+  132: { name: '金疮药', stack: 16, icon: '🧪', color: '#d84a6a', q: 5, heal: 60 },
+  133: { name: '干粮', stack: 16, icon: '🍱', color: '#c9a05a', q: 3, food: 80 },
+  134: { name: '重铠', stack: 1, icon: '🦺', color: '#8e97a3', q: 6, armor: 9 },
+  // ---- 矿脉产出：埋在地表之下，须持矿镐开采 ----
+  135: { name: '玉石', stack: 64, icon: '🟩', color: '#6fc7a8', q: 6 },
+  136: { name: '朱砂', stack: 64, icon: '🟥', color: '#c0392b', q: 3 },
+  137: { name: '铜矿', stack: 64, icon: '🟧', color: '#b87333', q: 2 },
+  138: { name: '锡矿', stack: 64, icon: '🟪', color: '#b0b7bd', q: 2 },
+  139: { name: '雄黄', stack: 64, icon: '🟨', color: '#e0a02a', q: 3 },
+  140: { name: '硫磺', stack: 64, icon: '🟡', color: '#d9c94a', q: 3 },
+  141: { name: '井盐', stack: 64, icon: '⚪', color: '#e8e2d6', q: 2 },
+  142: { name: '水晶', stack: 64, icon: '🔹', color: '#a8d8e8', q: 4 },
+  143: { name: '玛瑙', stack: 64, icon: '🔶', color: '#c0603a', q: 5 },
+  144: { name: '翡翠', stack: 64, icon: '🟢', color: '#2fae7a', q: 7 },
+  145: { name: '金矿', stack: 64, icon: '🥇', color: '#f2c94a', q: 6 },
+  146: { name: '银矿', stack: 64, icon: '🥈', color: '#dfe4ea', q: 5 },
+  // ---- 灵矿：罕见，高阶器物与符箓的根基 ----
+  147: { name: '灵石', stack: 64, icon: '💎', color: '#7fd0ff', q: 8 },
+  148: { name: '玄铁', stack: 64, icon: '🔘', color: '#4a5a72', q: 8 },
+  149: { name: '血玉', stack: 64, icon: '❤️', color: '#b02a3a', q: 9 },
+  150: { name: '雷晶', stack: 64, icon: '🌀', color: '#9a7fe8', q: 9 },
+  151: { name: '星砂', stack: 64, icon: '✨', color: '#e8d8ff', q: 10 },
 };
+
+/**
+ * 十阶品级。品级不只是标签：攻防、回复、效力都按 mul 折算，
+ * 所以仙品的铁剑确实比凡品的铁剑强得多。
+ */
+export const QUALITY = [
+  { tier: 1, name: '粗品', color: '#8a8f98', mul: 0.70 },
+  { tier: 2, name: '凡品', color: '#9aa7b0', mul: 0.80 },
+  { tier: 3, name: '常品', color: '#7fb069', mul: 0.90 },
+  { tier: 4, name: '良品', color: '#4f9fd4', mul: 1.00 },
+  { tier: 5, name: '上品', color: '#7f6bd6', mul: 1.12 },
+  { tier: 6, name: '精品', color: '#b06bd6', mul: 1.26 },
+  { tier: 7, name: '极品', color: '#d4a13a', mul: 1.42 },
+  { tier: 8, name: '绝品', color: '#e0663a', mul: 1.60 },
+  { tier: 9, name: '神品', color: '#d94f6a', mul: 1.82 },
+  { tier: 10, name: '仙品', color: '#6fe3d0', mul: 2.10 },
+];
+
+export function qualityOf(id) {
+  const it = ITEMS[id];
+  if (!it || !it.q) return QUALITY[0];
+  return QUALITY[Math.max(0, Math.min(9, it.q - 1))];
+}
+
+// 把品级折进数值：表里写的是基准值，这里一次性折成玩家拿到手的最终值，
+// 3D 与 2.5D 读到的都已是含品级的数，不必各自再算一遍。
+for (const it of Object.values(ITEMS)) {
+  const m = QUALITY[Math.max(0, Math.min(9, (it.q || 1) - 1))].mul;
+  if (it.armor != null) it.armor = Math.round(it.armor * m);
+  if (it.food != null) it.food = Math.round(it.food * m);
+  if (it.heal != null) it.heal = Math.round(it.heal * m);
+  if (it.tool && it.tool.damage != null) it.tool.damage = Math.round(it.tool.damage * m);
+}
 
 // 每种方块的代表色（用于 UI 与 2.5D 长卷着色）
 const BASE_COLORS = {

@@ -4,16 +4,34 @@ import { fbm2, rand2 } from '../core/noise.js';
 import { SEA } from './palette.js';
 import { STONE, ORE_COAL, ORE_IRON } from '../core/items.js';
 
-export const COPPER = 137, CINNABAR = 136, JADE = 135;
+// 写实矿物为主，掺入灵矿；灵矿罕见，是高阶器物与符箓的根基
+export const COPPER = 137, CINNABAR = 136, JADE = 135, TIN = 138, REALGAR = 139,
+  SULPHUR = 140, SALT = 141, CRYSTAL = 142, AGATE = 143, JADEITE = 144,
+  GOLD = 145, SILVER = 146, SPIRIT = 147, BLACK_IRON = 148, BLOOD_JADE = 149,
+  THUNDER = 150, STARDUST = 151;
 
-/** 六种矿脉：tier 是开采所需的最低镐级，exp 是每次采集给的采矿经验 */
+/** 二十种矿脉：tier 是开采所需的最低镐级，exp 是每次采集给的采矿经验，q 是品级 */
 export const ORES = [
-  { id: STONE, name: '青石', color: 0x8d949c, tier: 1, exp: 6, count: 3 },
-  { id: ORE_COAL, name: '煤矿', color: 0x464b52, tier: 1, exp: 10, count: 2 },
-  { id: ORE_IRON, name: '铁矿', color: 0xd08a4a, tier: 2, exp: 15, count: 2 },
-  { id: COPPER, name: '铜矿', color: 0xb87333, tier: 2, exp: 18, count: 2 },
-  { id: CINNABAR, name: '朱砂', color: 0xc0392b, tier: 3, exp: 24, count: 1 },
-  { id: JADE, name: '玉石', color: 0x6fc7a8, tier: 3, exp: 32, count: 1 },
+  { id: STONE, name: '青石', color: 0x8d949c, tier: 1, exp: 6, count: 3, q: 1 },
+  { id: ORE_COAL, name: '煤矿', color: 0x464b52, tier: 1, exp: 10, count: 2, q: 1 },
+  { id: ORE_IRON, name: '铁矿', color: 0xd08a4a, tier: 2, exp: 15, count: 2, q: 2 },
+  { id: COPPER, name: '铜矿', color: 0xb87333, tier: 2, exp: 18, count: 2, q: 2 },
+  { id: TIN, name: '锡矿', color: 0xb0b7bd, tier: 2, exp: 20, count: 2, q: 2 },
+  { id: SALT, name: '井盐', color: 0xe8e2d6, tier: 1, exp: 14, count: 3, q: 2 },
+  { id: CINNABAR, name: '朱砂', color: 0xc0392b, tier: 2, exp: 24, count: 2, q: 3 },
+  { id: REALGAR, name: '雄黄', color: 0xe0a02a, tier: 2, exp: 26, count: 1, q: 3 },
+  { id: SULPHUR, name: '硫磺', color: 0xd9c94a, tier: 2, exp: 26, count: 1, q: 3 },
+  { id: CRYSTAL, name: '水晶', color: 0xa8d8e8, tier: 3, exp: 34, count: 1, q: 4 },
+  { id: AGATE, name: '玛瑙', color: 0xc0603a, tier: 3, exp: 40, count: 1, q: 5 },
+  { id: SILVER, name: '银矿', color: 0xdfe4ea, tier: 3, exp: 52, count: 1, q: 5 },
+  { id: JADE, name: '玉石', color: 0x6fc7a8, tier: 3, exp: 48, count: 1, q: 6 },
+  { id: GOLD, name: '金矿', color: 0xf2c94a, tier: 3, exp: 64, count: 1, q: 6 },
+  { id: JADEITE, name: '翡翠', color: 0x2fae7a, tier: 3, exp: 72, count: 1, q: 7 },
+  { id: SPIRIT, name: '灵石', color: 0x7fd0ff, tier: 3, exp: 84, count: 1, q: 8 },
+  { id: BLACK_IRON, name: '玄铁', color: 0x4a5a72, tier: 3, exp: 92, count: 1, q: 8 },
+  { id: BLOOD_JADE, name: '血玉', color: 0xb02a3a, tier: 3, exp: 104, count: 1, q: 9 },
+  { id: THUNDER, name: '雷晶', color: 0x9a7fe8, tier: 3, exp: 116, count: 1, q: 9 },
+  { id: STARDUST, name: '星砂', color: 0xe8d8ff, tier: 3, exp: 140, count: 1, q: 10 },
 ];
 
 const ORE_BY_ID = new Map(ORES.map((o) => [o.id, o]));
@@ -32,13 +50,28 @@ export function oreAt(wx, wy, seed) {
   const field = fbm2(wx / 46, wy / 46, seed + 8801, 3);
   if (field < 0.50) return 0;
   if (rand2(wx, wy, seed + 8802) > 0.50) return 0;
+  // 越往下越罕见：常见石煤占大头，灵矿万中无一
   const k = rand2(wx, wy, seed + 8803);
-  if (k < 0.30) return STONE;
-  if (k < 0.58) return ORE_COAL;
-  if (k < 0.78) return ORE_IRON;
-  if (k < 0.90) return COPPER;
-  if (k < 0.97) return CINNABAR;
-  return JADE;
+  if (k < 0.180) return STONE;
+  if (k < 0.340) return ORE_COAL;
+  if (k < 0.460) return ORE_IRON;
+  if (k < 0.555) return COPPER;
+  if (k < 0.635) return TIN;
+  if (k < 0.700) return SALT;
+  if (k < 0.760) return CINNABAR;
+  if (k < 0.810) return REALGAR;
+  if (k < 0.855) return SULPHUR;
+  if (k < 0.892) return CRYSTAL;
+  if (k < 0.922) return AGATE;
+  if (k < 0.945) return SILVER;
+  if (k < 0.962) return JADE;
+  if (k < 0.974) return GOLD;
+  if (k < 0.983) return JADEITE;
+  if (k < 0.9895) return SPIRIT;
+  if (k < 0.994) return BLACK_IRON;
+  if (k < 0.9968) return BLOOD_JADE;
+  if (k < 0.9986) return THUNDER;
+  return STARDUST;
 }
 
 /** 露头处的矿种：矿区里出该区的矿，矿区之外也有零散的石材与煤，只是不富集 */

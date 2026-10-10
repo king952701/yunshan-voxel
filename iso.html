@@ -86,6 +86,74 @@
   .row .out i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border: 1px solid rgba(0,0,0,.5); }
   .row .in { color: #b9c3cf; }
   .row .tip { color: var(--jade); font-size: 11px; }
+
+  /* ---- 设置菜单与内置数据库 ---- */
+  #gear {
+    position: absolute; right: 14px; bottom: 14px; font: inherit; font-size: 12px;
+    padding: 6px 12px; cursor: pointer; color: var(--gold);
+    background: var(--panel); border: 1px solid var(--line);
+  }
+  #gear:hover { background: rgba(232,192,122,.18); }
+  .menu-wrap {
+    position: absolute; inset: 0; background: rgba(6,9,14,.72); z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .menu {
+    width: min(900px, 94vw); height: min(620px, 88vh); background: var(--panel);
+    border: 2px solid var(--line); display: flex; flex-direction: column; font-size: 12px;
+  }
+  .menu-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--gold);
+  }
+  .menu-head .mx {
+    font: inherit; cursor: pointer; color: #f2e9dc; background: transparent;
+    border: 1px solid var(--line); padding: 1px 7px;
+  }
+  .menu-tabs { display: flex; gap: 6px; padding: 8px 12px 0; }
+  .menu-tabs button, .cats button, .btns button {
+    font: inherit; font-size: 11px; padding: 3px 10px; cursor: pointer;
+    color: #cfd8e3; background: rgba(255,255,255,.06); border: 1px solid var(--line);
+  }
+  .menu-tabs button.on, .cats button.on, .btns button.on {
+    background: rgba(232,192,122,.22); color: var(--gold);
+  }
+  .menu-body { flex: 1; overflow: hidden; padding: 10px 12px 12px; }
+  .pane { height: 100%; overflow: hidden; }
+  .pane[data-pane="help"] { display: flex; gap: 10px; }
+  .help-left { width: 46%; display: flex; flex-direction: column; gap: 6px; }
+  .help-right {
+    flex: 1; border-left: 1px solid rgba(255,255,255,.1);
+    padding-left: 10px; overflow-y: auto;
+  }
+  .search {
+    font: inherit; font-size: 12px; padding: 5px 8px; width: 100%;
+    color: #f2e9dc; background: rgba(255,255,255,.06); border: 1px solid var(--line);
+  }
+  .cats { display: flex; flex-wrap: wrap; gap: 4px; }
+  .entries { flex: 1; overflow-y: auto; border: 1px solid rgba(255,255,255,.08); }
+  .entry { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: pointer; }
+  .entry:hover { background: rgba(232,192,122,.12); }
+  .entry.on { background: rgba(232,192,122,.2); }
+  .entry i { width: 9px; height: 9px; flex: 0 0 9px; border: 1px solid rgba(0,0,0,.5); }
+  .entry .s { flex: 1; color: #8b93a0; font-size: 11px; text-align: right; }
+  .detail h3 {
+    margin: 0 0 6px; font-size: 13px; color: var(--gold); font-weight: normal;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .detail h3 i { width: 10px; height: 10px; border: 1px solid rgba(0,0,0,.5); }
+  .detail .sub { color: #b9c3cf; margin-bottom: 8px; }
+  .detail .body { line-height: 1.9; color: #e6dccd; }
+  .pane .row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 4px; border-bottom: 1px solid rgba(255,255,255,.06);
+    cursor: default; grid-template-columns: none;
+  }
+  .pane .row:hover { background: transparent; }
+  .btns { display: flex; gap: 4px; }
+  .note { color: #8b93a0; font-size: 11px; line-height: 1.8; }
+  .pane[data-pane="about"] p { line-height: 2; }
+  .pane[data-pane="about"] a { color: var(--jade); }
 </style>
 </head>
 <body>
@@ -120,9 +188,12 @@
   <b>拖动</b> 漫游 · <b>滚轮</b> 缩放 · <b>WASD</b> 平移 · <b>R</b> 回中心 · <b>C</b> 开合成<br>
   <b>左键</b> 掘土开采 · <b>右键</b> 垒建材 · <b>1~9</b> 换建材（须先放大到近景）<br>
   <b>E</b> 采矿脉：靠近露头按 E，5 秒进度条，技能与镐越快越省时；采空 5 分钟后自行复生<br>
+  <b>Esc</b> 或右下角齿轮：设置与帮助（内含数据库，可按名称搜索）<br>
   整图 8000 × 8000 格，45° 等距投影，最小像素格<br>
   <a class="back" href="./index.html">← 回到 3D 体素版</a>
 </div>
+
+<button id="gear">⚙ 设置与帮助</button>
 
 <script type="module" src="./src/iso/main2d.js"></script>
 </body>

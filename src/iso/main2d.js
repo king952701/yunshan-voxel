@@ -10,7 +10,8 @@ import {
 import { Veins, oreInfo, FX_TIME, BASE_TIME } from './veins.js';
 import { Skills, gatherTime } from './skill.js';
 import { RECIPES, CATEGORIES, canCraft, craft } from '../game/crafting.js';
-import { itemName, itemColor, BRICK } from '../core/items.js';
+import { itemName, itemColor, qualityOf, BRICK } from '../core/items.js';
+import { createMenu } from './menu.js';
 
 const params = new URLSearchParams(location.search);
 const SEED = Number(params.get('seed') || 20261010) | 0;
@@ -27,8 +28,11 @@ const el = {
   toast: document.getElementById('toast'), craft: document.getElementById('craft'),
   craftBody: document.getElementById('craft-body'), tabs: document.getElementById('tabs'),
   skill: document.getElementById('skill'), pick: document.getElementById('pick'),
-  vein: document.getElementById('vein'),
+  vein: document.getElementById('vein'), hud: document.getElementById('hud'),
 };
+
+const settings = { daySpeed: 1, showHint: true, showPlayer: true, showHud: true };
+let menuApi = null;   // 设置菜单，末尾创建
 
 const map = new Map2D(SEED);
 const scroll = new Scroll(map);
@@ -88,6 +92,8 @@ canvas.addEventListener('wheel', (e) => {
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { if (menuApi) menuApi.toggle(); return; }
+  if (menuApi && menuApi.isOpen()) return;   // 菜单开着时不响应游戏按键
   keys[e.code] = true;
   if (e.code === 'KeyE') startGather();
   if (e.code === 'KeyC') { craftOpen = !craftOpen; el.craft.style.display = craftOpen ? 'block' : 'none'; if (craftOpen) renderCraft(); }
@@ -176,8 +182,11 @@ function renderBag() {
   for (const it of items) {
     const d = document.createElement('div');
     d.className = 'slot' + (it.id === selMat ? ' on' : '');
+    const q = qualityOf(it.id);
     d.innerHTML = `<i style="background:${itemColor(it.id)}"></i>`
-      + `<span>${itemName(it.id)}</span><b>${it.count}</b>`;
+      + `<span>${itemName(it.id)}`
+      + `<em style="color:${q.color};font-style:normal;font-size:10px"> ${q.name}</em></span>`
+      + `<b>${it.count}</b>`;
     d.onclick = () => {
       if (BUILD_MATS.includes(it.id)) { selMat = it.id; say(`选中${itemName(it.id)}`); renderBag(); }
       else say(`${itemName(it.id)}不是建材`);
@@ -263,6 +272,14 @@ function drawVeins(c) {
     if (p.cd > 0) continue;
     const s = screenOf(p.wx, p.wy, 1);
     const info = oreInfo(p.ore);
+    // 灵矿自带一层微光，隔着老远也能认出来
+    if (info.q >= 8) {
+      diamond(s[0], s[1], view.tw, view.th, 1.15);
+      ctx.globalAlpha = 0.26;
+      ctx.fillStyle = css(info.color, 1.1);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     diamond(s[0], s[1], view.tw, view.th, 0.62);
     ctx.fillStyle = css(info.color, 1);
     ctx.fill();
@@ -315,7 +332,7 @@ function drawGather(c) {
     ctx.fillRect(x, y, w * Math.min(1, gather.t / gather.dur), hh);
     ctx.fillStyle = '#f2e9dc';
     ctx.fillText(`采 ${oreInfo(p.ore).name} ${Math.max(0, gather.dur - gather.t).toFixed(1)}s`, s[0], y - 4);
-  } else {
+  } else if (settings.showHint) {
     const p = veins.nearest(c[0], c[1], 2);
     if (p) {
       const s = screenOf(c[0], c[1], 2);
@@ -354,7 +371,7 @@ function frame(now) {
   fpsAcc += 1 / Math.max(1e-4, dt); fpsN++; tAcc += dt;
   if (tAcc > 0.5) { fps = fpsAcc / fpsN; fpsAcc = 0; fpsN = 0; tAcc = 0; }
 
-  time = (time + dt / DAY_SEC) % 1;
+  time = (time + dt * (settings.daySpeed || 0) / DAY_SEC) % 1;
   handleKeys(dt);
   tickGather(dt);
   if (veins.tick(dt) > 0) say('矿脉复生');
@@ -384,13 +401,14 @@ function frame(now) {
       ctx.stroke();
     }
     drawVeins(c);
-    drawPlayer(c);
+    if (settings.showPlayer) drawPlayer(c);
     drawGather(c);
   }
 
   const sky = skyOf();
   canvas.style.filter = skyFilter(sky.dayF, sky.dawn);
 
+  el.hud.style.display = settings.showHud ? 'block' : 'none';
   el.coord.textContent = `${c[0]}, ${c[1]}`;
   el.zoom.textContent = view.near
     ? `近景 · 每格 ${view.tw.toFixed(1)}px`
@@ -424,5 +442,21 @@ view.lookAt(0, 0);
 renderBag();
 requestAnimationFrame(frame);
 
+// 设置菜单：设置 / 帮助（内置数据库）/ 关于
+menuApi = createMenu({
+  skills,
+  settings,
+  onSetting: () => {},
+  onResetTerrain: () => {
+    const n = terra.reset();
+    if (n) { scroll.repaint(); say(`复原 ${n} 处动土，山水回到最初`); }
+    else say('还没有动过土');
+  },
+});
+document.getElementById('gear').onclick = () => menuApi.toggle();
+
 // 控制台与自动化用的句柄：window.__iso.view.lookAt(x, y) 之类
-window.__iso = { map, view, veins, terra, inv, skills, scroll, gather: () => gather };
+window.__iso = {
+  map, view, veins, terra, inv, skills, scroll, settings, menu: () => menuApi,
+  gather: () => gather,
+};

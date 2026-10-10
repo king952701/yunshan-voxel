@@ -135,6 +135,13 @@ export class Scroll {
     return this.done;
   }
 
+  /** 整卷重画（复原地形时用）：一次性跑完，会顿一下 */
+  repaint() {
+    this.row = 0;
+    this.done = false;
+    while (!this.done) this.step(200);
+  }
+
   /** 坡度光影：光从西北（屏幕上方）来，山脊受光、背坡压暗 */
   shade(terra) {
     const n = this.w * this.h;
