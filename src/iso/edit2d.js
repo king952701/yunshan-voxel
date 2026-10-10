@@ -6,7 +6,9 @@ import {
   ROOF, GATE, ITEMS, itemName,
 } from '../core/items.js';
 
-export const MAT_MAX = 9999;   // 材料道具的叠加上限
+export const MAT_MAX = 9999;   // 旧的材料叠加上限，格子制之后只作参考
+export const BAG_SIZE = 500;   // 行囊五百格
+export const STORE_SIZE = 1000;   // 仓库一千格
 export const MIN_H = 4;        // 再挖就穿了
 export const MAX_H = 92;
 
@@ -19,42 +21,108 @@ export const BUILD_MATS = [
   EAVE, GLAZE_TILE, CRATE, STELE, ROOF, GATE,
 ];
 
+/** 每格能叠多少：兵器只叠一件，食物十六，材料六十四 */
 export function stackLimit(id) {
   const it = ITEMS[id];
-  return it && it.stack === 1 ? 1 : MAT_MAX;
+  if (!it) return 64;        // 方块类
+  return it.stack || 64;
 }
 
+/**
+ * 真正的格子制容器：背包五百格，仓库一千格。
+ * 同类物品先往没满的格里塞，塞不下再占新格；取用时跨格扣。
+ */
 export class Inventory {
-  constructor() {
-    this.slots = new Map();
+  constructor(size = BAG_SIZE) {
+    this.size = size;
+    this.slots = new Array(size).fill(null);   // 每格 { id, n } 或 null
   }
 
-  count(id) { return this.slots.get(id) || 0; }
+  /** 占了几格 */
+  used() {
+    let n = 0;
+    for (const s of this.slots) if (s) n++;
+    return n;
+  }
+
+  count(id) {
+    let n = 0;
+    for (const s of this.slots) if (s && s.id === id) n += s.n;
+    return n;
+  }
+
   has(id, n = 1) { return this.count(id) >= n; }
 
   add(id, n = 1) {
-    const room = stackLimit(id) - this.count(id);
-    const got = Math.max(0, Math.min(n, room));
-    if (got > 0) this.slots.set(id, this.count(id) + got);
-    return got;
+    const lim = stackLimit(id);
+    let left = n;
+    if (lim > 1) {
+      for (let i = 0; i < this.size && left > 0; i++) {
+        const s = this.slots[i];
+        if (!s || s.id !== id || s.n >= lim) continue;
+        const put = Math.min(left, lim - s.n);
+        s.n += put;
+        left -= put;
+      }
+    }
+    for (let i = 0; i < this.size && left > 0; i++) {
+      if (this.slots[i]) continue;
+      const put = Math.min(left, lim);
+      this.slots[i] = { id, n: put };
+      left -= put;
+    }
+    return n - left;
   }
 
   remove(id, n = 1) {
-    const have = this.count(id);
-    const take = Math.min(n, have);
-    if (take <= 0) return 0;
-    const left = have - take;
-    if (left > 0) this.slots.set(id, left);
-    else this.slots.delete(id);
-    return take;
+    let left = n;
+    for (let i = 0; i < this.size && left > 0; i++) {
+      const s = this.slots[i];
+      if (!s || s.id !== id) continue;
+      const take = Math.min(left, s.n);
+      s.n -= take;
+      left -= take;
+      if (s.n <= 0) this.slots[i] = null;
+    }
+    return n - left;
   }
 
-  /** 面板显示用：按 id 排序的 { id, count } */
+  /** 面板显示用：按 id 归并后的 { id, count } */
   list() {
-    return [...this.slots.entries()]
-      .filter(([, c]) => c > 0)
+    const m = new Map();
+    for (const s of this.slots) {
+      if (!s) continue;
+      m.set(s.id, (m.get(s.id) || 0) + s.n);
+    }
+    return [...m.entries()]
       .map(([id, count]) => ({ id, count }))
       .sort((a, b) => a.id - b.id);
+  }
+
+  /** 整理：同种物品归并，尽量少占格子 */
+  tidy() {
+    const all = this.list();
+    this.slots.fill(null);
+    for (const it of all) this.add(it.id, it.count);
+    return this.used();
+  }
+
+  /** 把某物挪到另一个容器（背包 ↔ 仓库），返回实际挪了多少 */
+  moveTo(other, id, n = Infinity) {
+    const want = Math.min(n, this.count(id));
+    let moved = 0;
+    for (let i = 0; i < this.size && moved < want; i++) {
+      const s = this.slots[i];
+      if (!s || s.id !== id) continue;
+      while (s.n > 0 && moved < want) {
+        const put = other.add(id, Math.min(s.n, want - moved));
+        if (put <= 0) break;
+        s.n -= put;
+        moved += put;
+        if (s.n <= 0) { this.slots[i] = null; break; }
+      }
+    }
+    return moved;
   }
 }
 
@@ -70,7 +138,9 @@ export function startingKit(inv) {
 /** 包里最趁手的某类家伙（pickaxe / axe / shovel / sickle / sword / rod） */
 export function bestTool(inv, kind) {
   let best = null;
-  for (const id of inv.slots.keys()) {
+  for (const s of inv.slots) {
+    if (!s) continue;
+    const id = s.id;
     const it = ITEMS[id];
     if (!it || !it.tool || it.tool.kind !== kind) continue;
     if (!best || it.tool.tier > best.tier) best = { id, ...it.tool };

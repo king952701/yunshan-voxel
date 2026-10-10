@@ -5,7 +5,7 @@ import { View2D, ZOOM_MULTS } from './view2d.js';
 import { renderFar, renderNear } from './render2d.js';
 import { skyFilter } from './palette.js';
 import {
-  Terra, Inventory, startingKit, BUILD_MATS, bestPick, bestTool,
+  Terra, Inventory, startingKit, BUILD_MATS, bestPick, bestTool, STORE_SIZE,
 } from './edit2d.js';
 import { Veins, oreInfo, FX_TIME, BASE_TIME } from './veins.js';
 import { Nodes, KINDS, kindInfo, NODE_CD } from './nodes.js';
@@ -32,6 +32,8 @@ const el = {
   craftBody: document.getElementById('craft-body'), tabs: document.getElementById('tabs'),
   skill: document.getElementById('skill'), pick: document.getElementById('pick'),
   vein: document.getElementById('vein'), hud: document.getElementById('hud'),
+  store: document.getElementById('store'), storeBody: document.getElementById('store-body'),
+  storeCap: document.getElementById('store-cap'),
 };
 
 const settings = { daySpeed: 1, showHint: true, showPlayer: true, showHud: true };
@@ -45,6 +47,7 @@ const veins = new Veins(map);
 const nodes = new Nodes(map);
 const skills = new Skills();
 const inv = new Inventory();
+const store = new Inventory(STORE_SIZE);   // 仓库一千格
 startingKit(inv);
 let selMat = BRICK;
 let img = null;
@@ -100,7 +103,16 @@ window.addEventListener('keydown', (e) => {
   if (menuApi && menuApi.isOpen()) return;   // 菜单开着时不响应游戏按键
   keys[e.code] = true;
   if (e.code === 'KeyE') startGather();
-  if (e.code === 'KeyC') { craftOpen = !craftOpen; el.craft.style.display = craftOpen ? 'block' : 'none'; if (craftOpen) renderCraft(); }
+  if (e.code === 'KeyC') {
+    craftOpen = !craftOpen;
+    el.craft.style.display = craftOpen ? 'block' : 'none';
+    if (craftOpen) { storeOpen = false; el.store.style.display = 'none'; renderCraft(); }
+  }
+  if (e.code === 'KeyB') {
+    storeOpen = !storeOpen;
+    el.store.style.display = storeOpen ? 'block' : 'none';
+    if (storeOpen) { craftOpen = false; el.craft.style.display = 'none'; renderStore(); }
+  }
   if (e.code === 'KeyR') view.lookAt(0, 0);
   const n = e.code.match(/^Digit([1-9])$/);
   if (n) {
@@ -245,8 +257,78 @@ function renderBag() {
     };
     el.bag.appendChild(d);
   }
+  const cap = document.createElement('div');
+  cap.className = 'note';
+  cap.style.cssText = 'padding:4px 2px';
+  cap.textContent = `${inv.used()} / ${inv.size} 格 · 按 B 开仓库（${store.used()}/${store.size}）`;
+  el.bag.appendChild(cap);
   el.mat.textContent = itemName(selMat);
   el.mat.style.color = itemColor(selMat);
+}
+
+// ------------------------------------------------------------------ 仓库
+let storeOpen = false;
+
+function renderStore() {
+  el.storeCap.textContent = `行囊 ${inv.used()}/${inv.size} 格　仓库 ${store.used()}/${store.size} 格`;
+  el.storeBody.innerHTML = '';
+  const head = (t) => {
+    const h = document.createElement('div');
+    h.className = 'note';
+    h.style.cssText = 'margin:6px 0 2px';
+    h.textContent = t;
+    el.storeBody.appendChild(h);
+  };
+  const rows = (from, to, label) => {
+    const items = from.list().slice(0, 40);
+    if (!items.length) {
+      const e = document.createElement('div');
+      e.className = 'note';
+      e.textContent = '（空）';
+      el.storeBody.appendChild(e);
+      return;
+    }
+    for (const it of items) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `<div class="out"><i style="background:${itemColor(it.id)}"></i>`
+        + `${itemName(it.id)}×${it.count}</div>`
+        + `<div class="tip">${label}</div>`;
+      row.onclick = () => {
+        const n = from.moveTo(to, it.id);
+        say(n ? `${label} ${itemName(it.id)}×${n}` : '腾不出地方了');
+        renderBag();
+        renderStore();
+      };
+      el.storeBody.appendChild(row);
+    }
+  };
+  head('行囊 —— 点一条存入仓库');
+  rows(inv, store, '存入');
+  head('仓库 —— 点一条取回行囊');
+  rows(store, inv, '取出');
+  const bar = document.createElement('div');
+  bar.className = 'btns';
+  bar.style.cssText = 'display:flex;gap:6px;padding:8px 0 2px';
+  const mk = (label, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = fn;
+    return b;
+  };
+  let total = 0;
+  bar.appendChild(mk('全部存入', () => {
+    for (const it of inv.list()) total += inv.moveTo(store, it.id);
+    say(total ? `存入 ${total} 件` : '腾不出地方了');
+    renderBag(); renderStore();
+  }));
+  bar.appendChild(mk('全部取出', () => {
+    for (const it of store.list()) total += store.moveTo(inv, it.id);
+    say(total ? `取出 ${total} 件` : '行囊装不下了');
+    renderBag(); renderStore();
+  }));
+  el.storeBody.appendChild(bar);
 }
 
 const CRAFT_PAGE = 40;
