@@ -2,14 +2,15 @@
 import { fbm2, ridged2, smoothstep, clamp } from './noise.js';
 import {
   S, biomeParams, biomeNameAt,
-  riverFactor, streamFactor, lakeFactor, waterCarve,
-  PINE, SNOW,
+  riverFactor, streamFactor, lakeFactor, waterCarve, mainRiver,
+  oceanSink, islandLift,
+  SNOW, SWAMP, MOUNT, TAIGA, FOREST,
 } from './biome.js';
 
 export const SEA = 28;          // 水面高度
 export const SNOW_LINE = 58;    // 雪线
 
-export { riverFactor, streamFactor, lakeFactor };
+export { riverFactor, streamFactor, lakeFactor, mainRiver, oceanSink, islandLift };
 
 /**
  * 地表高度（整数格）。
@@ -23,7 +24,9 @@ export function surfaceHeight(wx, wz, seed) {
   const ridge = ridged2(wx / (240 * S), wz / (240 * S), seed + 999, 4);
   const mountain = smoothstep(0.46, 0.72, cont);
   let h = SEA + 2 + p.lift + hill * (4 + p.amp) + mountain * (ridge * p.ridge - 4);
-  h -= waterCarve(wx, wz, seed, p);          // 江、溪、湖把地切开
+  h -= waterCarve(wx, wz, seed, p);          // 主江、支流、溪、湖把地切开
+  h -= oceanSink(wx, wz, seed);              // 四面环海，南部另沉一层南海
+  h += islandLift(wx, wz, seed);             // 海上再顶出些散岛
   h += (fbm2(wx / 26, wz / 26, seed + 4242, 2) - 0.5) * 2.2;   // 细颗粒
   return h;
 }
@@ -41,9 +44,10 @@ export function slopeAt(wx, wz, seed) {
 export function biomeAt(wx, wz, seed, h) {
   if (h <= SEA + 1) return 'water';
   const b = biomeNameAt(wx, wz, seed);
-  if (h >= SNOW_LINE - 4) return 'mountain';
-  if (riverFactor(wx, wz, seed) > 0.08) return 'riverbank';
-  return (b === PINE || b === SNOW) ? 'forest' : 'plain';
+  if (b === SWAMP) return 'swamp';
+  if (h >= SNOW_LINE - 4 || b === MOUNT) return 'mountain';
+  if (riverFactor(wx, wz, seed) > 0.08 || mainRiver(wx, wz, seed) > 0.05) return 'riverbank';
+  return (b === TAIGA || b === SNOW || b === FOREST) ? 'forest' : 'plain';
 }
 
 export { clamp };

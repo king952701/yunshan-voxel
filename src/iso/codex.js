@@ -10,7 +10,7 @@ import { ALL_RECIPES, CATEGORIES, CRAFT_CATS } from '../game/crafting.js';
 import { BUILD_MATS } from './edit2d.js';
 import { WORLD } from './world2d.js';
 import { SEA, SNOW_LINE } from './palette.js';
-import { BIOME_NAME, BLOCK_BIOME, REGION, MINE_KEYS, MINE_NAME } from '../core/biome.js';
+import { BIOME_NAME, GRID, MINE_KEYS, MINE_NAME } from '../core/biome.js';
 
 /** 索引分类 */
 export const CATS = [
@@ -160,49 +160,68 @@ export function buildCodex(skills) {
   }
 
   const n = WORLD;
-  const quarters = [];
-  for (let bi = 0; bi < BLOCK_BIOME.length; bi++) {
-    for (let bj = 0; bj < BLOCK_BIOME[bi].length; bj++) {
-      quarters.push(`${bi === 0 ? '北' : '南'}${bj === 0 ? '西' : '东'}：${BIOME_NAME[BLOCK_BIOME[bi][bj]]}`);
+  const zoneNames = [];
+  for (let r = 0; r < GRID.length; r++) {
+    for (let c = 0; c < GRID[r].length; c++) {
+      const z = GRID[r][c];
+      if (!zoneNames.includes(z)) zoneNames.push(z);
     }
   }
   out.push({
     cat: 'world', title: '云山图幅',
-    sub: `${n} × ${n} 格 · 四块大区`,
-    body: `整幅山水由四块不规则的大区拼成，每块 ${REGION} × ${REGION} 格：${quarters.join('、')}。`
-      + `块与块之间是草原过渡带，分界由噪声扭曲，所以不是直来直去的方格。`
+    sub: `${n} × ${n} 格 · 十二区 · 四面环海`,
+    body: `整幅山水分五横三纵，共 ${zoneNames.length} 区，四面环海：`
+      + `北部是雪原与针叶林，中北为沙丘、平原、山地，中央为戈壁、草原、阔叶林，`
+      + `中南为沼泽、河网、湖泊，最南五分之一是南海。`
+      + `分界由噪声扭曲，区与区之间插值过渡，所以既不是棋盘格，也不会出断崖。`
       + `一图共 ${(n * n / 1e6).toFixed(0)} 百万格，海平面 ${SEA}，雪线 ${SNOW_LINE}；`
       + `地形由纯函数生成，走到哪算到哪，改动另存一层，所以原始山水永远不会被写坏。`,
-    tags: '世界 图幅 山川 地形 海平面 雪线 大区 地貌',
+    tags: '世界 图幅 山川 地形 海平面 雪线 分区 地貌 海洋',
   });
 
-  // 五种地貌
-  const BIOME_DESC = {
-    snow: '高处终年积雪，雪线比别处低得多，只有背风的坡上长着成片的松林。',
-    pine: '丘陵连着丘陵，松林一望无际，林下多药丛与野兽，是伐木的好去处。',
-    grass: '平缓草场，也是块与块之间的过渡带；水边竹林与灌木最密。',
-    desert: '平旷少雨，满眼沙丘；低洼处偶尔汇成绿洲，湖边才见草与灌木。',
-    loess: '黄土塬被雨水切出道道沟壑，陡处露崖，塬面上草与灌木相间。',
+  // 十二区各是什么样子
+  const POS = {
+    snow: '北部西半', taiga: '北部东半',
+    dune: '中北·西', plain: '中北·中', mount: '中北·东',
+    gobi: '中央·西', steppe: '中央·中', forest: '中央·东',
+    swamp: '中南·西', rivernet: '中南·中', lake: '中南·东',
+    ocean: '南部 1/5',
   };
-  for (const key of Object.keys(BIOME_NAME)) {
+  const BIOME_DESC = {
+    snow: '极北的雪原，终年积雪，雪线比别处低得多；雪线之下是冻土苔原，山间挂着冰川与雪溪。',
+    taiga: '北方的针叶林海，深绿连绵，林下多药丛与野兽，是伐木的好去处。',
+    dune: '西北的沙丘，风蚀出一道道波纹；低洼处偶尔积成绿洲，湖边才见草与灌木。',
+    plain: '中北平原，平缓开阔，主河穿境而过，两岸最宜安家。',
+    mount: '东北山地，群峰壁立、崖多雪早，五金矿山多半藏在这里。',
+    gobi: '西部戈壁，黄褐碎石遍地，雨水稀少，只长着旱生的稀疏灌木。',
+    steppe: '中央草原，世界的心脏，草场连绵、灌木点缀，河网自此发端。',
+    forest: '东部阔叶林，茂密深绿，林中最是阴凉，野兽也最多。',
+    swamp: '西南沼泽，低平积水，泥泞水道与浮萍连片，涉水要当心。',
+    rivernet: '中南河网，主河在此分出无数支流，溪涧密如蛛网。',
+    lake: '东南湖泊群，大小湖泊由小溪串成一串，水边芦苇与灌木最密。',
+    ocean: '南海，占最南五分之一；沿岸有沙滩、崖岸与半岛，海中散布着小岛。',
+  };
+  for (const key of zoneNames) {
     out.push({
       cat: 'world', title: `地貌 · ${BIOME_NAME[key]}`,
-      sub: key === 'grass' ? '过渡带 · 亦成片出现' : `一块 ${REGION} × ${REGION}`,
+      sub: POS[key] || '一带',
       body: BIOME_DESC[key],
-      tags: `地貌 ${BIOME_NAME[key]} 大区 地形 山川`,
+      tags: `地貌 ${BIOME_NAME[key]} 分区 地形 山川`,
     });
   }
 
-  // 水系：江、溪、湖
+  // 水系：主河、支流、溪、湖、海
   const WATERS = [
-    ['河流', '大江横贯全图，河心最深，两岸留河滩；沿河最宜安家，走兽也来饮水。'],
-    ['小溪', '细密支流，比江窄得多也多得多，顺着山脊蜿蜒；溪畔多是灌木与药丛。'],
-    ['湖泊', '低洼处积水成湖，湖心最深；沙漠里的湖就是绿洲，湖边才长出草来。'],
+    ['主河', '一条主河自北部雪山发源，蜿蜒南下穿过平原，越到下游越宽，最后注入南海；两岸留河滩，沿河最宜安家。'],
+    ['支流', '主河之外的蜿蜒大江，横贯各区；河心最深，走兽常来饮水。'],
+    ['小溪', '沿山脊的细密支流，比江窄得多也多得多；溪畔多是灌木与药丛。'],
+    ['湖泊', '低洼处积水成湖。东南是一整片湖群，由小溪串连；别处的湖则零星散布。'],
+    ['海洋', '四面环海，南面最阔。沿岸有沙滩与崖岸，海中散布岛屿；越往外越深。'],
   ];
   for (const [name, body] of WATERS) {
     out.push({
       cat: 'world', title: `水系 · ${name}`, sub: '随机生成', body,
-      tags: `水系 ${name} 水 地图 河流 湖泊`,
+      tags: `水系 ${name} 水 地图 河流 湖泊 海洋`,
     });
   }
 

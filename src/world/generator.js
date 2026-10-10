@@ -2,7 +2,7 @@
 // 因此相邻区块边界天然连续，不存在接缝。
 import { noise3, clamp, rand2 } from '../core/noise.js';
 import { surfaceHeight, riverFactor, slopeAt, biomeAt, SEA, SNOW_LINE } from '../core/terrain.js';
-import { biomeNameAt, DESERT } from '../core/biome.js';
+import { biomeNameAt, DUNE, GOBI } from '../core/biome.js';
 import {
   AIR, GRASS, DIRT, STONE, SAND, WATER, SNOW, GRAVEL, ORE_COAL, ORE_IRON,
 } from './blocks.js';
@@ -30,8 +30,9 @@ export function generateChunkData(cx, cz, seed) {
       let h = Math.round(surfaceHeight(wx, wz, seed));
       h = clamp(Math.round(h), 3, HEIGHT - 14);
       heights[z * CHUNK + x] = h;
-      // 沙漠那块大区连地下都是沙，与 2.5D 长卷看到的是同一片山川
-      const arid = biomeNameAt(wx, wz, seed) === DESERT;
+      // 沙丘与戈壁连地下都是沙，与 2.5D 长卷看到的是同一片山川
+      const b = biomeNameAt(wx, wz, seed);
+      const arid = b === DUNE || b === GOBI;
 
       const beach = h <= SEA + 1;
       const snowy = h >= SNOW_LINE;

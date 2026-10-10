@@ -1,11 +1,14 @@
 // 中式山水：高度与地表都是 (坐标 + 种子) 的纯函数，
 // 按需分块生成并缓存，绝不预先展开几亿格。
-// 图幅与地貌分区读 core/biome.js：四块 8000×8000 的不规则大区。
-import { surfaceHeight, riverFactor, streamFactor, lakeFactor } from '../core/terrain.js';
+// 图幅与地貌分区读 core/biome.js：五横三纵十二区，四面环海。
+import { surfaceHeight, riverFactor, streamFactor, lakeFactor, mainRiver } from '../core/terrain.js';
 import { fbm2, clamp } from '../core/noise.js';
 import { SEA, SNOW_LINE, T, surfaceRGB } from './palette.js';
 import { blockBaseColor } from '../core/items.js';
-import { WORLD, HALF, S, biomeParams, SNOW, PINE, DESERT, LOESS } from '../core/biome.js';
+import {
+  WORLD, HALF, S, biomeParams, biomeNameAt,
+  SNOW, TAIGA, DUNE, GOBI, MOUNT, FOREST, SWAMP, RIVERNET, LAKE,
+} from '../core/biome.js';
 
 export { WORLD, HALF };
 const CH = 64;              // 区块边长（格）
@@ -72,31 +75,42 @@ export class Map2D {
 }
 
 /**
- * 地表分类：先按高度定水陆，再按所在地貌定植被。
- * 同一片植被噪声，雪原、松林、草原、沙漠、黄土的门槛各不相同，
- * 所以五块地方各有各的长相，而不是一张绿图刷到底。
+ * 地表分类：先按高度定水陆，再按所在分区定植被。
+ * 同一片植被噪声，雪原、针叶林、草原、戈壁、沙丘、沼泽的门槛各不相同，
+ * 所以十二区各有各的长相，而不是一张绿图刷到底。
  */
 export function classify(wx, wy, h, slope, seed) {
-  if (h <= SEA - 3) return T.DEEP;
+  // 沼泽里的水是暗绿泥水，不是深海的那种蓝
+  if (h <= SEA - 3) return biomeNameAt(wx, wy, seed) === SWAMP && h > SEA - 9 ? T.SWAMP : T.DEEP;
   if (h <= SEA) return T.WATER;
   const p = biomeParams(wx, wy, seed);
   const b = p.biome;
-  if (h <= SEA + 2) return p.sand > 0.5 ? T.DUNE : T.SAND;   // 水边滩地
+  // 水边滩地：沙则沙滩，湿则泥滩
+  if (h <= SEA + 2) return p.sand > 0.5 ? T.DUNE : (b === SWAMP ? T.SWAMP : T.SAND);
+  // 沼泽：低平积水，泥泞水道与浮萍连片
+  if (b === SWAMP && h <= SEA + 5
+    && lakeFactor(wx, wy, seed, p) + streamFactor(wx, wy, seed, p) > 0.05) return T.SWAMP;
   if (h >= SNOW_LINE + p.snowLine) return T.SNOW;
-  // 这套地形整体平缓（相邻高差常在 1 格以内），崖壁阈值按实测坡度标定；黄土多沟壑，更容易露崖
-  if (slope > (b === LOESS ? 2.6 : 1.8)) return T.ROCK;
-  if (riverFactor(wx, wy, seed) > 0.05 || streamFactor(wx, wy, seed) > 0.10) return T.BANK;
+  // 雪线之下是冻土苔原，不是一白到底
+  if (b === SNOW && h >= SNOW_LINE + p.snowLine - 9) return T.TUNDRA;
+  // 这套地形整体平缓（相邻高差常在 1 格以内），崖壁阈值按实测坡度标定；山地最陡
+  const cliff = b === MOUNT ? 3.0 : b === GOBI ? 2.3 : 1.8;
+  if (slope > cliff) return T.ROCK;
+  if (mainRiver(wx, wy, seed) > 0.05 || riverFactor(wx, wy, seed) > 0.05
+    || streamFactor(wx, wy, seed, p) > 0.10) return T.BANK;
   const veg = fbm2(wx / (300 * S), wy / (300 * S), seed + 313, 2);
   const cover = veg * (0.5 + p.tree);
-  if (b === PINE) return cover > 0.34 ? T.PINE : cover > 0.26 ? T.FOREST : T.GRASS;
-  if (b === SNOW) return cover > 0.50 ? T.PINE : T.SNOW;
-  if (b === DESERT) {
-    if (lakeFactor(wx, wy, seed) > 0.15) return T.GRASS;     // 绿洲
-    return cover > 0.38 ? T.SHRUB : T.DUNE;                   // 沙生灌木
-  }
-  // 黄土要看得见土：草与灌木只占一半，塬面大片露着赭黄的土
-  if (b === LOESS) return cover > 0.42 ? T.GRASS : cover > 0.32 ? T.SHRUB : T.LOESS;
-  // 草原：也是块与块之间的过渡带
+
+  if (b === TAIGA) return cover > 0.34 ? T.PINE : cover > 0.26 ? T.FOREST : T.GRASS;
+  if (b === FOREST) return cover > 0.40 ? T.FOREST : cover > 0.30 ? T.SHRUB : T.GRASS;
+  if (b === MOUNT) return cover > 0.42 ? T.FOREST : cover > 0.30 ? T.SHRUB : T.ROCK;
+  if (b === SNOW) return cover > 0.55 ? T.PINE : T.TUNDRA;
+  if (b === DUNE) return cover > 0.38 ? T.SHRUB : T.DUNE;          // 沙丘与沙生灌木
+  if (b === GOBI) return cover > 0.45 ? T.SHRUB : T.GOBI;          // 戈壁碎石地
+  if (b === SWAMP) return cover > 0.40 ? T.SWAMP : T.GRASS;
+  if (b === LAKE) return cover > 0.42 ? T.FOREST : cover > 0.30 ? T.SHRUB : T.GRASS;
+  if (b === RIVERNET) return cover > 0.38 ? T.FOREST : cover > 0.28 ? T.SHRUB : T.GRASS;
+  // 平原与草原：也是区与区之间的过渡带
   if (cover > 0.44) return T.FOREST;
   const bamboo = fbm2(wx / (190 * S), wy / (190 * S), seed + 6161, 2);
   if (bamboo > 0.635 && p.wet > 0.6) return T.BAMBOO;

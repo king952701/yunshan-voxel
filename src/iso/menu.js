@@ -2,7 +2,6 @@
 // 帮助里就是内置数据库，左侧索引右侧详情，可按关键词搜索。
 import { CATS, buildCodex, searchCodex, codexByCat, catCount } from './codex.js';
 import { WORLD } from './world2d.js';
-import { REGION } from '../core/biome.js';
 
 const DAY_SPEEDS = [
   { v: 0, label: '静止' },
@@ -52,8 +51,10 @@ export function createMenu(opts) {
           <p class="note save-note"></p>
         </div>
         <div class="pane" data-pane="about" hidden>
-          <p><b>云山录</b>　${WORLD}×${WORLD} 的中式山水：由四块 ${REGION}×${REGION} 的
-             不规则大区拼成（雪原、松林、沙漠、黄土，草原做过渡带），45° 等距、最小像素格。</p>
+          <p><b>云山录</b>　${WORLD}×${WORLD} 的中式山水，四面环海。全图分五横三纵十二区：
+             北部雪原与针叶林，中北沙丘、平原、山地，中央戈壁、草原、阔叶林，
+             中南沼泽、河网、湖泊，南部是南海。分界由噪声扭曲，区与区之间是渐变过渡带。
+             45° 等距、最小像素格。</p>
           <p>同一片山川两副看法：<a href="index.html">体素山川（3D）</a>与
              <a href="iso.html">山水长卷（2.5D）</a>，地形由同一套函数生成。</p>
           <p>地形、矿脉、配方均为确定性生成：同一个种子，同一片山水。</p>

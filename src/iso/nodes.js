@@ -68,11 +68,14 @@ export function nodeLoot(kind, wx, wy, seed, type) {
 // 每类点长在什么地表上
 const GROUND = {
   tree: (t) => t === T.FOREST || t === T.BAMBOO || t === T.GRASS || t === T.PINE,
-  shrub: (t) => t === T.SHRUB || t === T.GRASS || t === T.LOESS || t === T.DUNE,
-  herb: (t) => t === T.GRASS || t === T.FOREST || t === T.BANK || t === T.SHRUB,
-  fish: (t) => t === T.WATER || t === T.DEEP,
+  shrub: (t) => t === T.SHRUB || t === T.GRASS || t === T.LOESS || t === T.DUNE
+    || t === T.GOBI || t === T.TUNDRA,
+  herb: (t) => t === T.GRASS || t === T.FOREST || t === T.BANK || t === T.SHRUB
+    || t === T.SWAMP,
+  fish: (t) => t === T.WATER || t === T.DEEP || t === T.SWAMP,
   beast: (t) => t === T.FOREST || t === T.GRASS || t === T.BAMBOO || t === T.PINE,
-  soil: (t) => t === T.SAND || t === T.BANK || t === T.ROCK || t === T.DUNE || t === T.LOESS,
+  soil: (t) => t === T.SAND || t === T.BANK || t === T.ROCK || t === T.DUNE
+    || t === T.LOESS || t === T.GOBI,
   berry: (t) => t === T.GRASS || t === T.FOREST || t === T.BAMBOO || t === T.SHRUB,
 };
 
